@@ -8,23 +8,34 @@ CORS(app)
 leiloes = [{"id": "1", "item": "relogio"},
            {"id": "2", "item": "lampada"}]
 
+url_mslance = 'http://localhost:4445'
+
+
+def _find_next_id():
+    return max(leiloes["id"] for leilao in leiloes) + 1
 
 @app.get("/")
 def index():
     return render_template("index.html")
 
-
 @app.get("/leiloes")
 def get_leiloes():
-    # implementar leitura das filas do rabbitmq 
+    res = request.get(url_mslance + 'leiloes')
+    leiloes = res.json()
     return jsonify(leiloes)
+
+@app.get("/leiloes/<int:leilao_id>")
+def get_leiloes1(leilao_id: int):
+    # implementar leitura das filas do rabbitmq
+    for leilao in leiloes: 
+     if int(leilao["id"]) == leilao_id:  
+        return jsonify(leilao)
+    return {'error': 'leilao nao encontrado'}
 
 
 @app.post("/leiloes")
 def add_leilao():
-    #data = request.body
-   # print(data)
-    #leiloes.append(data)
+    #bater no endpoint do ms leilao para criar novo leilao 
     return "ok"
 
 @app.post("/pagamento")
