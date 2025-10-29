@@ -4,8 +4,14 @@ function myFunction() {
   document.getElementById("demo").innerHTML = "Paragraph changed.";
 }
 
-function criaLeilao() {
-    fetch()
+function criaLeilao(item) {
+    const url = baseUrl + 'leiloes'
+    const res = fetch(url, {method: 'POST',
+                            headers: {'Content-Type':'application/json'} ,
+                            body:  JSON.stringify({item: item.trim()}) } )
+    //if(res.ok){
+    document.getElementById("demo").textContent = 'Criado com sucesso';
+    //}
 }
 
 async function buscaLeiloes(){
