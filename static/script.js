@@ -1,9 +1,5 @@
 let baseUrl = "http://localhost:4444/"
 
-function myFunction() {
-  document.getElementById("demo").innerHTML = "Paragraph changed.";
-}
-
 function criaLeilao(item) {
     const url = baseUrl + 'leiloes'
     const res = fetch(url, {method: 'POST',
