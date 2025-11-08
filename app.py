@@ -20,11 +20,12 @@ def pagamento_page():
 
 @app.get("/leiloes")
 def get_leiloes():
+    # TODO implentar leitura das filas do rabbitmq pra ele so mostrar os leiloes ativos
     return jsonify(leiloes)
 
 @app.get("/leiloes/<int:leilao_id>")
 def get_leiloes1(leilao_id: int):
-    # implementar leitura das filas do rabbitmq
+    # TODO implementar leitura das filas do rabbitmq pra ele so mostrar os leiloes ativos
     for leilao in leiloes: 
      if int(leilao["id"]) == leilao_id:  
         return jsonify(leilao)

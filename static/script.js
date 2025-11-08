@@ -26,12 +26,12 @@ function renderLeiloes(lista) {
     document.getElementById("demo").textContent = "Nenhum leilão ativo";
     return;
   }
-  let html = "";
+  let texto = "";
   for (let i = 0; i < lista.length; i++) {
     const l = lista[i];
-    html += l.id + " - " + (l.item || l.descricao || "") + "\n";
+    texto += l.id + " - " + (l.item || l.descricao || "") + "\n";
   }
-  document.getElementById("demo").textContent = html;
+  document.getElementById("demo").textContent = texto;
 }
 
 window.addEventListener("load", buscaLeiloes);
