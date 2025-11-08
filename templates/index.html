@@ -1,20 +1,29 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
+  <head>
+    <meta charset="UTF-8" />
     <title>Leilão</title>
-</head>
-<body>
+  </head>
+  <body>
     <h1>Aplicação REST de leilão</h1>
     <p id="demo">A Paragraph</p>
     <button type="button" onclick="buscaLeiloes()">Buscar</button>
 
     <h1>Criar novo leilão</h1>
     <form>
-        <label for="item">Item:</label><br>
-        <input type="text" id="item" name="item" value=""><br>
-    </form> 
-    <button type="button" onclick="criaLeilao(document.getElementById('item').value)">Criar</button>
-<script src="/static/script.js"></script>
-</body>
+      <label for="item">Item:</label><br />
+      <input type="text" id="item" name="item" value="" /><br />
+    </form>
+    <button
+      type="button"
+      onclick="criaLeilao(document.getElementById('item').value)"
+    >
+      Criar
+    </button>
+    <hr />
+    <p>
+      <a href="/pagamento">Ir para Pagamentos</a>
+    </p>
+    <script src="/static/script.js"></script>
+  </body>
 </html>

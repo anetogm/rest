@@ -18,6 +18,10 @@ def _find_next_id():
 def index():
     return render_template("index.html")
 
+@app.get("/pagamento")
+def pagamento_page():
+    return render_template("pagamento.html")
+
 @app.get("/leiloes")
 def get_leiloes():
     res = request.get(url_mslance + 'leiloes')
