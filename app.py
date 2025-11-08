@@ -10,10 +10,6 @@ leiloes = [{"id": "1", "item": "relogio"},
 
 url_mslance = 'http://localhost:4445'
 
-
-def _find_next_id():
-    return max(leiloes["id"] for leilao in leiloes) + 1
-
 @app.get("/")
 def index():
     return render_template("index.html")
@@ -24,8 +20,6 @@ def pagamento_page():
 
 @app.get("/leiloes")
 def get_leiloes():
-    res = request.get(url_mslance + 'leiloes')
-    leiloes = res.json()
     return jsonify(leiloes)
 
 @app.get("/leiloes/<int:leilao_id>")
