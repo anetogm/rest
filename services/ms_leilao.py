@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import threading
 
 inicio = datetime.now() + timedelta(seconds=2)
-fim = inicio + timedelta(minutes=1)
+fim = inicio + timedelta(minutes=50)
 
 leiloes = [
 	{

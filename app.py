@@ -1,26 +1,34 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 from flask_cors import CORS
 import subprocess
+<<<<<<< HEAD
 import requests
+=======
+from datetime import datetime, timedelta
+>>>>>>> Antonio
 
 app = Flask(__name__)
-CORS(app)  
+CORS(app) 
 
-leiloes = [{"id": "1", "item": "relogio"},
-           {"id": "2", "item": "lampada"}]
+inicio = datetime.now() + timedelta(seconds=2)
+fim = inicio + timedelta(minutes=50) 
+
+leiloes = [{"id": "1", "item": "relogio", "descricao": "Relogio de pulso", "valor_inicial": 100, "inicio": inicio, "fim": fim},
+           {"id": "2", "item": "lampada", "descricao": "Lampada LED", "valor_inicial": 50, "inicio": inicio, "fim": fim}]
 
 url_mslance = 'http://localhost:4445'
-
-
-def _find_next_id():
-    return max(leiloes["id"] for leilao in leiloes) + 1
 
 @app.get("/")
 def index():
     return render_template("index.html")
 
+@app.get("/pagamento")
+def pagamento_page():
+    return render_template("pagamento.html")
+
 @app.get("/leiloes")
 def get_leiloes():
+<<<<<<< HEAD
 <<<<<<< Updated upstream
     res = request.get(url_mslance + 'leiloes')
     leiloes = res.json()
@@ -33,7 +41,7 @@ def get_leiloes():
 
 @app.get("/leiloes/<int:leilao_id>")
 def get_leiloes1(leilao_id: int):
-    # implementar leitura das filas do rabbitmq
+    # TODO implementar leitura das filas do rabbitmq pra ele so mostrar os leiloes ativos
     for leilao in leiloes: 
      if int(leilao["id"]) == leilao_id:  
         return jsonify(leilao)
@@ -42,13 +50,27 @@ def get_leiloes1(leilao_id: int):
 
 @app.post("/leiloes")
 def add_leilao():
-    #bater no endpoint do ms leilao para criar novo leilao 
-    return "ok"
+    data = request.get_json(silent=True) or {}
+    item = (data.get('item') or '').strip()
+    descricao = data.get('descricao', '')
+    valor_inicial = data.get('valor_inicial', 0)
+    inicio = data.get('inicio', '')
+    fim = data.get('fim', '')
+    
+    if not item:
+        return jsonify({'error': 'item é obrigatório'}), 400
+
+    # TODO ler a fila de leiloes ativos pra ver a quantidade (aqui eu to fazendo no pelo olhando o tamanho do dicionario)
+    # TODO pegar o nome do produto, descricao, valor inicial e hora de inicio e fim do leilao
+    next_id = str(max(int(l['id']) for l in leiloes) + 1) if leiloes else '1'
+
+    novo = { 'id': next_id, 'item': item, 'descricao': descricao, 'valor_inicial': valor_inicial, 'inicio': inicio, 'fim': fim}
+    leiloes.append(novo)
+    return jsonify(novo), 201
 
 @app.post("/pagamento")
 def pagamento():
     return pagamento
-
 
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=4444, debug=True)

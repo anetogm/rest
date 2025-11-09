@@ -1,20 +1,52 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
+  <head>
+    <meta charset="UTF-8" />
     <title>Leilão</title>
-</head>
-<body>
+  </head>
+  <body>
     <h1>Aplicação REST de leilão</h1>
     <p id="demo">A Paragraph</p>
     <button type="button" onclick="buscaLeiloes()">Buscar</button>
 
     <h1>Criar novo leilão</h1>
-    <form>
-        <label for="item">Item:</label><br>
-        <input type="text" id="item" name="item" value=""><br>
-    </form> 
-    <button type="button" onclick="criaLeilao(document.getElementById('item').value)">Criar</button>
-<script src="/static/script.js"></script>
-</body>
+
+    <div id="leilao-form">
+      <label for="item">Item:</label><br />
+      <input type="text" id="item" name="item" placeholder="Nome do item" /><br /><br />
+
+      <label for="descricao">Descrição:</label><br />
+      <textarea id="descricao" name="descricao" placeholder="Descrição do item"></textarea><br /><br />
+
+      <label for="valor-inicial">Valor inicial:</label><br />
+      <input
+        type="number"
+        id="valor-inicial"
+        name="valor-inicial"
+        placeholder="Valor inicial"
+        step="0.01"
+      /><br /><br />
+
+      <div id="inicio-opcoes">
+        <label>Início do leilão:</label><br />
+        <input type="checkbox" id="chk-agora" /> <label for="chk-agora">Começar agora</label>
+        <button id="btn-escolher" type="button">Escolher horário</button><br /><br />
+        <input type="datetime-local" id="inicio" style="display: none" />
+      </div>
+      <br />
+
+      <label for="fim">Fim do leilão:</label><br />
+      <input type="datetime-local" id="fim" name="fim" /><br /><br />
+
+      <button type="button" id="btn-criar">Criar leilão</button>
+    </div>
+
+    <hr />
+    <p>
+      <a href="/pagamento">Ir para Pagamentos</a>
+    </p>
+
+    <!-- Script principal -->
+    <script src="/static/script.js"></script>
+  </body>
 </html>
