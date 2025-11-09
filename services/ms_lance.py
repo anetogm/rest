@@ -38,22 +38,16 @@ def callback_lance_realizado(ch, method, properties, body):
         if leilao_id not in leiloes_ativos:
             print("Leilão não ativo.")
             return
-<<<<<<< HEAD
         
         atual = lances_atuais.get(leilao_id)
         if atual is None or valor > atual['valor']:
-=======
             
         if leilao_id not in lances_atuais or valor > lances_atuais[leilao_id]['valor']:
->>>>>>> Antonio
             lances_atuais[leilao_id] = {'id_cliente': id_cliente, 'valor': valor}
             channel.basic_publish(exchange='', routing_key='lance_validado', body=json.dumps(msg))
             print("Lance válido e registrado.")
         else:
-<<<<<<< HEAD
-=======
             channel.basic_publish(exchange='', routing_key='lance_invalidado', body=json.dumps(msg))
->>>>>>> Antonio
             print("Lance não é maior que o atual.")
     except Exception as e:
         print(f"Erro ao processar lance: {e}")
@@ -77,8 +71,6 @@ def callback_leilao_finalizado(ch, method, properties, body):
         print(f"Vencedor publicado: {msg_vencedor}")
         del lances_atuais[leilao_id]
 
-<<<<<<< HEAD
-=======
 connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
 channel = connection.channel()
 
@@ -92,7 +84,6 @@ channel.basic_consume(queue='leilao_finalizado', on_message_callback=callback_le
 
 print(' [*] Esperando mensagens. Para sair pressione CTRL+C')
 channel.start_consuming()
->>>>>>> Antonio
 
 @app.get("/leiloes")
 def get_ativos():
@@ -109,7 +100,6 @@ def esta_ativo(leiloes):
     for leilao in leiloes:
         if leilao['fim'] < agora:
             leilao_aux.append(leilao)
-<<<<<<< HEAD
     return leilao_aux
             
 def start_consumer():
@@ -130,6 +120,4 @@ if __name__ == "__main__":
     t.start()
     # run Flask app in main thread so it is reachable on port 4445
     app.run(host="127.0.0.1", port=4445, debug=True)
-=======
     return leilao_aux
->>>>>>> Antonio

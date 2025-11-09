@@ -1,11 +1,8 @@
 from flask import Flask, jsonify, render_template, request
 from flask_cors import CORS
 import subprocess
-<<<<<<< HEAD
 import requests
-=======
 from datetime import datetime, timedelta
->>>>>>> Antonio
 
 app = Flask(__name__)
 CORS(app) 
@@ -28,16 +25,13 @@ def pagamento_page():
 
 @app.get("/leiloes")
 def get_leiloes():
-<<<<<<< HEAD
-<<<<<<< Updated upstream
     res = request.get(url_mslance + 'leiloes')
     leiloes = res.json()
     return jsonify(leiloes)
-=======
+
     leiloes = requests.get(url_mslance + "/leiloes")
     print(f"leiloes: {leiloes.json()}")
     return jsonify(leiloes.json())
->>>>>>> Stashed changes
 
 @app.get("/leiloes/<int:leilao_id>")
 def get_leiloes1(leilao_id: int):
