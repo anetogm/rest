@@ -6,12 +6,13 @@ import threading
 
 inicio = datetime.now() + timedelta(seconds=2)
 fim = inicio + timedelta(minutes=50)
+fim_inativo = inicio - timedelta(minutes=10)
 
 leiloes = [
 	{
 		'id': 1,
 		'nome': 'Notebook',
-		'descricao': 'Macbook Pro 16" M2 Max, assinado pelo Steve Jobs',
+		'descricao': 'Macbook Pro 16" M2 Max assinado pelo Steve Jobs',
 		'valor_inicial': 1000,
 		'inicio': inicio,
 		'fim': fim,
@@ -20,10 +21,10 @@ leiloes = [
 	{
 		'id': 2,
 		'nome':'celular',
-		'descricao': 'Iphone 17 Pro Max Turbo, assinado pelo Steve Jobs',
+		'descricao': 'Iphone 17 Pro Max Turbo assinado pelo Steve Jobs',
 		'valor_inicial': 2000,
 		'inicio': inicio,
-        'fim': fim,
+        'fim': fim_inativo,
 		'status': 'ativo'
 	}
 ]

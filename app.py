@@ -25,10 +25,6 @@ def pagamento_page():
 
 @app.get("/leiloes")
 def get_leiloes():
-    res = request.get(url_mslance + 'leiloes')
-    leiloes = res.json()
-    return jsonify(leiloes)
-
     leiloes = requests.get(url_mslance + "/leiloes")
     print(f"leiloes: {leiloes.json()}")
     return jsonify(leiloes.json())
