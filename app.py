@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 from flask_cors import CORS
 import subprocess
 
@@ -34,8 +34,17 @@ def get_leiloes1(leilao_id: int):
 
 @app.post("/leiloes")
 def add_leilao():
-    #bater no endpoint do ms leilao para criar novo leilao 
-    return "ok"
+    data = request.get_json(silent=True) or {}
+    item = (data.get('item') or '').strip()
+    if not item:
+        return jsonify({'error': 'item é obrigatório'}), 400
+
+    # TODO ler a fila de leiloes ativos pra ver a quantidade (aqui eu to fazendo no pelo olhando o tamanho do dicionario)
+    next_id = str(max(int(l['id']) for l in leiloes) + 1) if leiloes else '1'
+
+    novo = { 'id': next_id, 'item': item }
+    leiloes.append(novo)
+    return jsonify(novo), 201
 
 @app.post("/pagamento")
 def pagamento():

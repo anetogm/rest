@@ -1,5 +1,5 @@
 import datetime
-from flask import Flask ,jsonify ,request
+from flask import Flask ,jsonify
 import pika
 import base64
 import json
@@ -18,19 +18,18 @@ def callback_lance_realizado(ch, method, properties, body):
         leilao_id = msg['leilao_id']
         id_cliente = msg['id_cliente']
         valor = msg['valor']
-        assinatura = base64.b64decode(msg['assinatura'])
         
         if leilao_id not in leiloes_ativos:
             print("Leilão não ativo.")
             return
-        
             
         if leilao_id not in lances_atuais or valor > lances_atuais[leilao_id]['valor']:
             lances_atuais[leilao_id] = {'id_cliente': id_cliente, 'valor': valor}
             channel.basic_publish(exchange='', routing_key='lance_validado', body=json.dumps(msg))
             print("Lance válido e registrado.")
         else:
-                print("Lance não é maior que o atual.")
+            channel.basic_publish(exchange='', routing_key='lance_invalidado', body=json.dumps(msg))
+            print("Lance não é maior que o atual.")
     except Exception as e:
         print(f"Erro ao processar lance: {e}")
 
@@ -58,13 +57,11 @@ channel.queue_declare(queue='lance_validado')
 channel.queue_declare(queue='lance_invalidado')
 channel.queue_declare(queue='leilao_vencedor')
 
-
 channel.basic_consume(queue='leilao_iniciado', on_message_callback=callback_leilao_iniciado, auto_ack=True)
 channel.basic_consume(queue='leilao_finalizado', on_message_callback=callback_leilao_finalizado, auto_ack=True)
 
 print(' [*] Esperando mensagens. Para sair pressione CTRL+C')
 channel.start_consuming()
-
 
 @app.get("/leiloes")
 def get_ativos():
@@ -78,4 +75,3 @@ def esta_ativo(leiloes):
         if leilao['fim'] < agora:
             leilao_aux.append(leilao)
     return leilao_aux
-            

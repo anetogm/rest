@@ -1,13 +1,23 @@
 let baseUrl = "http://localhost:4444/";
 
-function criaLeilao(item) {
+async function criaLeilao(item) {
   const url = baseUrl + "leiloes";
-  fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ item: item.trim() }),
-  });
-  document.getElementById("demo").textContent = "Criado com sucesso";
+  try {
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ item: item.trim() }),
+    });
+    if (!resp.ok) {
+      document.getElementById("demo").textContent = "Erro ao criar";
+      return;
+    }
+    const criado = await resp.json();
+    document.getElementById("demo").textContent = "Criado: " + criado.id + " - " + criado.item;
+    buscaLeiloes();
+  } catch (e) {
+    document.getElementById("demo").textContent = "Falha na criação";
+  }
 }
 
 async function buscaLeiloes() {
