@@ -10,14 +10,18 @@ fim = inicio + timedelta(minutes=1)
 leiloes = [
 	{
 		'id': 1,
-		'descricao': 'Notebook',
+		'nome': 'Notebook',
+		'descricao': 'Macbook Pro 16" M2 Max, assinado pelo Steve Jobs',
+		'valor_inicial': 1000,
 		'inicio': inicio,
 		'fim': fim,
 		'status': 'ativo'
 	},
 	{
 		'id': 2,
-		'descricao': 'Celular',
+		'nome':'celular',
+		'descricao': 'Iphone 17 Pro Max Turbo, assinado pelo Steve Jobs',
+		'valor_inicial': 2000,
 		'inicio': inicio,
         'fim': fim,
 		'status': 'ativo'
@@ -29,8 +33,6 @@ channel = connection.channel()
 
 
 channel.queue_declare(queue='leilao_iniciado')
-channel.queue_declare(queue='leilao_1')
-channel.queue_declare(queue='leilao_2')
 channel.queue_declare(queue='leilao_finalizado')
 channel.queue_declare(queue='leilao_vencedor')
 channel.queue_declare(queue='lance_realizado')
@@ -61,13 +63,13 @@ def gerenciar_leilao(leilao):
 	if tempo_ate_inicio > 0:
 		time.sleep(tempo_ate_inicio)
 	leilao['status'] = 'ativo'
-	publicar_fanout('inicio', f"{leilao['id']};{leilao['descricao']};{leilao['inicio']}")
+	publicar_evento('leilao_iniciado', f"{leilao['id']},{leilao['nome']},{leilao['descricao']},{leilao['valor_inicial']},{leilao['inicio']},{leilao['fim']}")
 
 	tempo_ate_fim = (leilao['fim'] - datetime.now()).total_seconds()
 	if tempo_ate_fim > 0:
 		time.sleep(tempo_ate_fim)
 	leilao['status'] = 'encerrado'
-	publicar_evento('leilao_finalizado', f"{leilao['id']};{leilao['descricao']};{leilao['fim']}")
+	publicar_evento('leilao_finalizado', f"{leilao['id']},{leilao['nome']},{leilao['descricao']},{leilao['valor_inicial']},{leilao['valor_inicial']},{leilao['fim']}")
 
 def main():
 	threads = []

@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 import subprocess
+import requests
 
 app = Flask(__name__)
 CORS(app)  
@@ -20,9 +21,15 @@ def index():
 
 @app.get("/leiloes")
 def get_leiloes():
+<<<<<<< Updated upstream
     res = request.get(url_mslance + 'leiloes')
     leiloes = res.json()
     return jsonify(leiloes)
+=======
+    leiloes = requests.get(url_mslance + "/leiloes")
+    print(f"leiloes: {leiloes.json()}")
+    return jsonify(leiloes.json())
+>>>>>>> Stashed changes
 
 @app.get("/leiloes/<int:leilao_id>")
 def get_leiloes1(leilao_id: int):
