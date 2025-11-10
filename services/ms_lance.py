@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 from flask import Flask ,jsonify
 import pika
 import base64
@@ -91,7 +91,7 @@ def callback_leilao_finalizado(ch, method, properties, body):
 def get_ativos():
     try:
         with lock:
-            snapshot = list(leiloes_ativos.values())
+            snapshot = leiloes_ativos
         snapshot = esta_ativo(snapshot)
         ativos = converte_datetime(snapshot)
         return jsonify(ativos)
@@ -100,17 +100,22 @@ def get_ativos():
 
 def converte_datetime(ativos):
     for l in ativos:
-        if isinstance(l.get('inicio'), datetime.datetime):
-            l['inicio'] = l['inicio'].isoformat()
-        if isinstance(l.get('fim'), datetime.datetime):
-            l['fim'] = l['fim'].isoformat()
+        if isinstance(ativos[l]['inicio'], datetime):
+            ativos[l]['inicio'] = ativos[l]['inicio'].isoformat()
+        if isinstance(ativos[l]['fim'], datetime):
+            ativos[l]['fim'] = ativos[l]['fim'].isoformat()
     return ativos
     
 def esta_ativo(leiloes):
-    agora = datetime.time()
+    agora = datetime.now()
     leilao_aux = {}
     for leilao in leiloes:
-        if leilao['fim'] < agora:
+        print(f"{leiloes[leilao]['fim']} &&  {agora}")
+        print(f"{type(leiloes[leilao]['fim'])} &&  {type(agora)}")
+        fim = datetime.fromisoformat(leiloes[leilao]['fim'])
+        print(type(fim))
+        print(f"fim: {fim}  agora: {agora}")
+        if fim > agora:
             leilao_aux[leilao['id']] = leilao
     return leilao_aux
             
