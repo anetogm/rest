@@ -1,5 +1,5 @@
 from datetime import datetime
-from flask import Flask ,jsonify
+from flask import Flask ,jsonify, request
 import pika
 import json
 import os
@@ -63,6 +63,30 @@ def start_consumer():
     channel.basic_consume(queue='leilao_finalizado', on_message_callback=callback_leilao_finalizado, auto_ack=True)
     print(' [*] Consumer started. Waiting messages.')
     channel.start_consuming()
+
+@app.post("/lance")
+def receber_lance():
+    data = request.get_json()
+    print(f"\n\n\n\n\nRecebido lance: {data}")
+    leilao_id = int(data.get('leilao_id'))
+    user_id = data.get('user_id')
+    valor = float(data.get('valor'))
+    
+    with lock:
+        if leilao_id not in leiloes_ativos:
+            return jsonify({'error': 'Leilão não ativo'}), 400
+        
+        lance_atual = lances_atuais.get(leilao_id)
+        if lance_atual and valor <= lance_atual['valor']:
+            return jsonify({'error': 'Lance deve ser maior que o atual'}), 400
+        
+        lances_atuais[leilao_id] = {'id_cliente': user_id, 'valor': valor}
+        
+        msg = json.dumps({'leilao_id': leilao_id, 'user_id': user_id, 'valor': valor})
+        channel.basic_publish(exchange='', routing_key='lance_validado', body=msg)
+        
+    return jsonify({'message': 'Lance validado'})
+
 
 if __name__ == "__main__":
     t = threading.Thread(target=start_consumer, daemon=True)

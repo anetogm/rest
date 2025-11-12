@@ -41,8 +41,3 @@ function renderLeiloes(lista) {
 
   demoEl.textContent = texto;
 }
-
-window.addEventListener("load", () => {
-  // Buscar leilões na carga da página
-  buscaLeiloes();
-});

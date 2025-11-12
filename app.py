@@ -1,12 +1,13 @@
 from flask import Flask, jsonify, render_template, request, redirect
 from flask_cors import CORS
-import subprocess
 import requests
-from requests.exceptions import RequestException
-from datetime import datetime, timedelta
+import secrets
+
+# TODO ver com o augusto se ele quer uma pagina so pro lance ou se ele acha mais interessante deixar no index.html tambem
 
 app = Flask(__name__)
-CORS(app) 
+app.secret_key = secrets.token_hex(16)
+CORS(app)
 
 leiloes = []
 
@@ -36,6 +37,10 @@ def get_leiloes1(leilao_id: int):
 def cadastra_leilao_page():
     return render_template("cadastra_leilao.html")
 
+@app.get("/lance")
+def lance_page():
+    return render_template("lance.html")
+
 @app.post("/cadastra_leilao")
 def cadastra_leilao():
         item = (request.form.get('item') or '').strip()
@@ -55,6 +60,22 @@ def cadastra_leilao():
 
         leiloes.append(novo)
         return redirect("/cadastra_leilao?success=1")
+
+@app.post("/lance")
+def lance():
+    data = request.get_json()
+    leilao_id = data.get("leilao_id")
+    user_id = data.get("user_id")
+    valor = data.get("valor")
+
+    if not leilao_id or not user_id or not valor:
+        return jsonify({"error": "Dados incompletos"}), 400
+
+    resp = requests.post(url_mslance + "/lance", json=data)
+    if resp.status_code != 200:
+        return jsonify({"error": "Erro ao enviar lance"}), 500
+
+    return jsonify({"message": "Lance enviado com sucesso"})
 
 @app.post("/pagamento")
 def pagamento():
