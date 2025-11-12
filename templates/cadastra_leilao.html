@@ -1,3 +1,4 @@
+<!-- templates/cadastra_leilao.html -->
 <!doctype html>
 <html lang="pt-BR">
 <head>
@@ -14,12 +15,16 @@
         .row > * { flex:1; }
         button { margin-top:16px; padding:10px 14px; background:#0078d4; color:#fff; border:none; border-radius:4px; cursor:pointer; }
         button:hover { background:#005a9e; }
+        .success-message { color: green; font-weight: bold; margin-top: 10px; padding: 10px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; display: none; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Cadastrar Leilão</h1>
-    <form id="cadastraLeilaoForm" action="/cadastra_leilao" method="post">
+        <!-- Mensagem de sucesso -->
+        <div id="successMessage" class="success-message">Leilão adicionado com sucesso!</div>
+        
+        <form id="cadastraLeilaoForm" action="/cadastra_leilao" method="post">
             <label for="item">Item</label>
             <input id="item" name="item" type="text" required />
 
@@ -45,6 +50,23 @@
             </div>
             <button type="submit">Cadastrar Leilão</button>
         </form>
+        <!-- Botão para voltar à tela inicial -->
+        <p style="margin-top: 20px; text-align: center;">
+            <a href="/" style="text-decoration: none; padding: 10px 14px; background: #28a745; color: #fff; border-radius: 4px;">Voltar para Tela Inicial</a>
+        </p>
     </div>
+
+    <script>
+        // Verifica se há parâmetro 'success' na URL
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('success') === '1') {
+            const message = document.getElementById('successMessage');
+            message.style.display = 'block';  // Mostra a mensagem
+            // Opcional: Esconde após 5 segundos
+            setTimeout(() => {
+                message.style.display = 'none';
+            }, 5000);
+        }
+    </script>
 </body>
-</html></div>
+</html>

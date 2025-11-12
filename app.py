@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, redirect
 from flask_cors import CORS
 import subprocess
 import requests
@@ -54,7 +54,7 @@ def cadastra_leilao():
         resp.raise_for_status()
 
         leiloes.append(novo)
-        return jsonify({'status': 'forwarded', 'leilao': novo}), 201
+        return redirect("/cadastra_leilao?success=1")
 
 @app.post("/pagamento")
 def pagamento():
