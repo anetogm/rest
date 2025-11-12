@@ -52,7 +52,6 @@ def cria_leilao():
 	try:
 		data = request.get_json(silent=True) or {}
 		if not data:
-
 			data = {k: v for k, v in request.form.items()}
 
 		nome = data.get('item') or data.get('nome') or ''
@@ -97,9 +96,6 @@ def cria_leilao():
 def publicar_evento(fila, mensagem):
     # TODO essa parada é o SSE enviando as notificações
 	try:
-		if channel is None:
-			print(f"[ms_leilao] publish skipped (no channel): {fila} -> {mensagem}")
-			return
 		with lock:
 			channel.basic_publish(exchange='', routing_key=fila, body=mensagem)
 			print(f"[x] Evento publicado em {fila}: {mensagem}")
@@ -149,44 +145,46 @@ lances_atuais = {}
 @app.get("/leiloes")
 def get_ativos():
 	with lock:
-		snapshot = dict(leiloes_ativos)
-	ativos_dict = esta_ativo(snapshot)
-	ativos_list = converte_datetime(ativos_dict.values())
-	return jsonify(ativos_list)
+		snapshot = leiloes
+	ativos = esta_ativo(snapshot)
+	ativos = converte_datetime(ativos)
+	return jsonify(ativos)
+
+from datetime import datetime
 
 def esta_ativo(leiloes):
-	agora = datetime.now()
-	ativos = {}
-	for key, leilao in leiloes.items():
-		inicio = leilao.get('inicio')
-		fim = leilao.get('fim')
+    agora = datetime.now()
+    ativos = []
 
-		if isinstance(inicio, str):
-			try:
-				inicio = datetime.fromisoformat(inicio)
-			except Exception:
-				continue
-		if isinstance(fim, str):
-			try:
-				fim = datetime.fromisoformat(fim)
-			except Exception:
-				continue
+    for leilao in leiloes:
+        inicio = leilao.get('inicio')
+        fim = leilao.get('fim')
+        status = leilao.get('status')
 
-		if not isinstance(inicio, datetime) or not isinstance(fim, datetime):
-			continue
-		if inicio >= fim:
-			continue
-		if inicio <= agora < fim:
-			ativos[key] = leilao
-	return ativos
+        if isinstance(inicio, str):
+            try:
+                inicio = datetime.fromisoformat(inicio)
+            except Exception:
+                continue
+
+        if isinstance(fim, str):
+            try:
+                fim = datetime.fromisoformat(fim)
+            except Exception:
+                continue
+
+        if status == 'ativo' or (inicio <= agora < fim):
+            ativos.append(leilao)
+
+    return ativos
 
 if __name__ == "__main__":
 	print("[MS Leilao] Gerenciando leilões...")
 	threading.Thread(target=start_consume, daemon=True).start()
 
 	with lock:
-		for l in leiloes:
-			leiloes_ativos[str(l['id'])] = l
+		for i, l in enumerate(leiloes):
+			l['id'] = i + 1
 
 	threading.Thread(target=main, daemon=True).start()
 	app.run(host="127.0.0.1", port=4447, debug=False, use_reloader=False)
