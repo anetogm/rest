@@ -1,36 +1,112 @@
 from flask import Flask, jsonify, render_template, request, redirect
 from flask_cors import CORS
+from flask_sse import sse
+from apscheduler.schedulers.background import BackgroundScheduler
 import requests
 import secrets
 import threading
 import pika
+import json
 
 # TODO ver com o augusto se ele quer uma pagina so pro lance ou se ele acha mais interessante deixar no index.html tambem
 
 lock = threading.Lock()
 app = Flask(__name__)
+app.config["REDIS_URL"] = "redis://localhost:6379/0"
+app.register_blueprint(sse, url_prefix='/stream')
+
 app.secret_key = secrets.token_hex(16)
 CORS(app)
 
 leiloes = []
+interesses = {}
 
 url_mslance = 'http://localhost:4445'
 url_msleilao = 'http://localhost:4447'
 
 def callback_lance_validado(ch, method, properties, body):
     print('[App] Recebido em lance_validado:', body)
-    
+    try:
+        data = json.loads(body.decode())
+        leilao_id = data.get('leilao_id')
+        cliente_id = data.get('user_id')  # Cliente que fez o lance
+        valor = data.get('valor')
+        
+        with lock:
+            print(interesses)
+            interessados = interesses.get(leilao_id, set())
+        for cid in interessados:
+            sse.publish({
+                'tipo': 'novo_lance_valido',
+                'leilao_id': leilao_id,
+                'valor': valor,
+                'cliente_id_lance': cliente_id
+            }, channel=cid)
+    except Exception as e:
+        print(f'Erro ao processar lance_validado: {e}')
+
 def callback_lance_invalidado(ch, method, properties, body):
     print('[App] Recebido em lance_invalidado:', body)
-    
+    try:
+        data = json.loads(body.decode())
+        cliente_id = data.get('user_id')
+        
+        sse.publish({
+            'tipo': 'lance_invalido',
+            'leilao_id': data.get('leilao_id'),
+            'valor': data.get('valor')
+        }, channel=cliente_id)
+    except Exception as e:
+        print(f'Erro ao processar lance_invalidado: {e}')
+
 def callback_leilao_vencedor(ch, method, properties, body):
     print('[App] Recebido em leilao_vencedor:', body)
-    
+    try:
+        data = json.loads(body.decode())
+        leilao_id = data.get('leilao_id')
+        id_vencedor = data.get('id_vencedor')
+        valor = data.get('valor')
+        
+        # Notificação: Vencedor do leilão (apenas aos interessados no leilao_id)
+        with lock:
+            interessados = interesses.get(leilao_id, set())
+        for cid in interessados:
+            sse.publish({
+                'tipo': 'vencedor_leilao',
+                'leilao_id': leilao_id,
+                'id_vencedor': id_vencedor,
+                'valor': valor
+            }, channel=cid)
+    except Exception as e:
+        print(f'Erro ao processar leilao_vencedor: {e}')
+
 def callback_link_pagamento(ch, method, properties, body):
     print('[App] Recebido em link_pagamento:', body)
-    
+    try:
+        data = json.loads(body.decode())
+        cliente_id = data.get('cliente_id')  
+        link = data.get('link')
+        
+        sse.publish({
+            'tipo': 'link_pagamento',
+            'link': link
+        }, channel=cliente_id)
+    except Exception as e:
+        print(f'Erro ao processar link_pagamento: {e}')
+
 def callback_status_pagamento(ch, method, properties, body):
     print('[App] Recebido em status_pagamento:', body)
+    try:
+        data = json.loads(body.decode())
+        cliente_id = data.get('cliente_id')
+        status = data.get('status')
+        
+        sse.publish({
+            'tipo': 'status_pagamento',
+            'status': status
+        }, channel=cliente_id)
+    except Exception as e:
+        print(f'Erro ao processar status_pagamento: {e}')
 
 def start_consumer():
     global channel
@@ -97,7 +173,6 @@ def cadastra_leilao():
         return redirect("/cadastra_leilao?success=1")
 
 @app.post("/lance")
-# TODO ver a parte de pegar o user id (nao ta dando certo desse jeito)
 def lance():
     data = request.get_json()
     leilao_id = data.get("leilao_id")
@@ -117,6 +192,42 @@ def lance():
 def pagamento():
     # TODO ver isso depois
     return pagamento
+
+@app.post("/registrar_interesse")
+def registrar_interesse():
+    # TODO contextualizar pro augusto que de alguma maneira ele nao ta printando os interesses
+    data = request.get_json()
+    leilao_id = data.get('leilao_id')
+    cliente_id = data.get('cliente_id')
+    
+    if not leilao_id or not cliente_id:
+        return jsonify({'error': 'leilao_id e cliente_id são obrigatórios'}), 400
+    
+    with lock:
+        print(leilao_id)
+        if leilao_id not in interesses:
+            interesses[leilao_id] = set()
+            print(interesses)
+        interesses[leilao_id].add(cliente_id)
+    
+    return jsonify({'message': 'Interesse registrado com sucesso'})
+
+@app.post("/cancelar_interesse")
+def cancelar_interesse():
+    data = request.get_json()
+    leilao_id = data.get('leilao_id')
+    cliente_id = data.get('cliente_id')
+    
+    if not leilao_id or not cliente_id:
+        return jsonify({'error': 'leilao_id e cliente_id são obrigatórios'}), 400
+    
+    with lock:
+        if leilao_id in interesses:
+            interesses[leilao_id].discard(cliente_id)
+            if not interesses[leilao_id]:
+                del interesses[leilao_id]
+    
+    return jsonify({'message': 'Interesse cancelado com sucesso'})
 
 if __name__ == "__main__":
     t = threading.Thread(target=start_consumer, daemon=True)

@@ -1,12 +1,13 @@
 let baseUrl = "http://localhost:4444/";
+let clienteId = getUserIdFromSessionStorage();
+let eventSource;
 
-// Retorna string no formato compatível com <input type="datetime-local"> no fuso local
 function nowForDatetimeLocal() {
   const now = new Date();
   now.setSeconds(0, 0);
   const tzOffsetMin = now.getTimezoneOffset();
   const local = new Date(now.getTime() - tzOffsetMin * 60000);
-  return local.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
+  return local.toISOString().slice(0, 16);
 }
 
 async function buscaLeiloes() {
@@ -20,24 +21,107 @@ async function buscaLeiloes() {
   }
 }
 
+async function registrarInteresse(leilaoId) {
+  console.log('Tentando registrar interesse:', leilaoId, clienteId);  // Adicione isso
+  try {
+    const res = await fetch(`${baseUrl}registrar_interesse`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leilao_id: leilaoId, cliente_id: clienteId })
+    });
+    console.log('Resposta:', res.status, res.statusText);
+    if (!res.ok) throw new Error(`Erro HTTP: ${res.status}`);
+    const data = await res.json();
+    alert(data.message);
+  } catch (e) {
+    console.error('Erro:', e);
+    alert('Erro ao registrar interesse: ' + e.message);
+  }
+}
+
+async function cancelarInteresse(leilaoId) {
+  try {
+    const res = await fetch(`${baseUrl}cancelar_interesse`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leilao_id: leilaoId, cliente_id: clienteId })
+    });
+    const data = await res.json();
+    alert(data.message);
+  } catch (e) {
+    alert('Erro ao cancelar interesse');
+  }
+}
+
 function renderLeiloes(lista) {
   const demoEl = document.getElementById("demo");
+  demoEl.innerHTML = "";
 
   if (lista.length === 0) {
-    demoEl.style.whiteSpace = "normal";
     demoEl.textContent = "Nenhum leilão ativo";
     return;
   }
 
-  demoEl.style.whiteSpace = "pre-line";
+  lista.forEach(l => {
+    const div = document.createElement('div');
+    div.style.marginBottom = "10px";
+    div.textContent = `${l.id} - ${l.nome || ''} (${l.descricao || ''})`;
 
-  let texto = "";
-  for (let i = 0; i < lista.length; i++) {
-    const l = lista[i];
-    const nome = l.nome || "";
-    const descricao = l.descricao || "";
-    texto += `${l.id} - ${nome} (${descricao})\n`;
-  }
+    const btnRegistrar = document.createElement('button');
+    btnRegistrar.textContent = 'Registrar Interesse';
+    btnRegistrar.style.marginLeft = "10px";
+    btnRegistrar.onclick = () => registrarInteresse(l.id);
 
-  demoEl.textContent = texto;
+    const btnCancelar = document.createElement('button');
+    btnCancelar.textContent = 'Cancelar Interesse';
+    btnCancelar.style.marginLeft = "5px";
+    btnCancelar.onclick = () => cancelarInteresse(l.id);
+
+    div.appendChild(btnRegistrar);
+    div.appendChild(btnCancelar);
+
+    demoEl.appendChild(div);
+  });
 }
+
+function conectarSSE() {
+  eventSource = new EventSource(`${baseUrl}stream?channel=${clienteId}`);
+
+  eventSource.onmessage = function (event) {
+    try {
+      const data = JSON.parse(event.data);
+      console.log("Notificação SSE:", data);
+      if (data.tipo === "novo_lance_valido") {
+        alert(
+          `Novo lance válido no leilão ${data.leilao_id}: R$ ${data.valor}`
+        );
+        buscaLeiloes();
+      } else if (data.tipo === "lance_invalido") {
+        alert("Seu lance foi inválido.");
+      } else if (data.tipo === "vencedor_leilao") {
+        alert(
+          `Leilão ${data.leilao_id} encerrado. Vencedor: ${data.id_vencedor}`
+        );
+      } else if (data.tipo === "link_pagamento") {
+        alert(`Link de pagamento: ${data.link}`);
+      } else if (data.tipo === "status_pagamento") {
+        alert(`Status do pagamento: ${data.status}`);
+      }
+    } catch (e) {
+      console.error("Erro ao processar dados SSE:", e);
+    }
+  };
+}
+
+function getUserIdFromSessionStorage() {
+  let userId = sessionStorage.getItem("userId");
+  if (!userId) {
+    userId = crypto.randomUUID();
+    sessionStorage.setItem("userId", userId);
+  }
+  return userId;
+}
+
+window.onload = function () {
+  conectarSSE();
+};

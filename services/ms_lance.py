@@ -54,6 +54,8 @@ def start_consumer():
     global channel
     connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
     channel = connection.channel()
+    channel.queue_declare(queue='leilao_iniciado')
+    channel.queue_declare(queue='leilao_finalizado')
     channel.queue_declare(queue='leilao_vencedor')
     channel.queue_declare(queue='lance_validado')
     channel.queue_declare(queue='lance_invalidado')

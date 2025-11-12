@@ -19,11 +19,10 @@
     <script>
       let baseUrl = "http://localhost:4444/";
 
-      // Função para gerar ou obter user_id único por aba
       function getUserIdFromSessionStorage() {
         let userId = sessionStorage.getItem("userId");
         if (!userId) {
-          userId = crypto.randomUUID(); // Gera UUID único
+          userId = crypto.randomUUID();
           sessionStorage.setItem("userId", userId);
         }
         return userId;
@@ -32,7 +31,7 @@
       async function fazerLance() {
         const leilaoId = document.getElementById("leilaoId").value;
         const valorLance = document.getElementById("valorLance").value;
-        const userId = getUserIdFromSessionStorage(); // Obtém ID único por aba
+        const userId = getUserIdFromSessionStorage();
 
         if (!leilaoId || !valorLance) {
           document.getElementById("resultado").textContent =
