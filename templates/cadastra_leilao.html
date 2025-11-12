@@ -19,7 +19,7 @@
 <body>
     <div class="container">
         <h1>Cadastrar Leilão</h1>
-        <form id="cadastraLeilaoForm" action="localhost:4444/cadastra_leilao" method="post">
+    <form id="cadastraLeilaoForm" action="/cadastra_leilao" method="post">
             <label for="item">Item</label>
             <input id="item" name="item" type="text" required />
 
@@ -28,19 +28,19 @@
 
             <div class="row">
                 <div>
-                    <label for="preco_inicial">Preço inicial (R$)</label>
-                    <input id="preco_inicial" name="preco_inicial" type="number" step="0.01" min="0" required />
+                    <label for="valor_inicial">Preço inicial (R$)</label>
+                    <input id="valor_inicial" name="valor_inicial" type="number" step="0.01" min="0" required />
                 </div>
             </div>
 
             <div class="row">
                 <div>
                     <label for="data_inicio">Data/hora início</label>
-                    <input id="data_inicio" name="data_inicio" type="datetime-local" required />
+                    <input id="inicio" name="inicio" type="datetime-local" required />
                 </div>
                 <div>
                     <label for="data_fim">Data/hora término</label>
-                    <input id="data_fim" name="data_fim" type="datetime-local" required />
+                    <input id="fim" name="fim" type="datetime-local" required />
                 </div>
             </div>
             <button type="submit">Cadastrar Leilão</button>
