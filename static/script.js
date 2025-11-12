@@ -21,34 +21,34 @@ async function buscaLeiloes() {
 }
 
 async function registrarInteresse(leilaoId) {
-  console.log('Tentando registrar interesse:', leilaoId, clienteId);  // Adicione isso
+  console.log("Tentando registrar interesse:", leilaoId, clienteId); // Adicione isso
   try {
     const res = await fetch(`${baseUrl}registrar_interesse`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ leilao_id: leilaoId, cliente_id: clienteId })
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ leilao_id: leilaoId, cliente_id: clienteId }),
     });
-    console.log('Resposta:', res.status, res.statusText);
+    console.log("Resposta:", res.status, res.statusText);
     if (!res.ok) throw new Error(`Erro HTTP: ${res.status}`);
     const data = await res.json();
     alert(data.message);
   } catch (e) {
-    console.error('Erro:', e);
-    alert('Erro ao registrar interesse: ' + e.message);
+    console.error("Erro:", e);
+    alert("Erro ao registrar interesse: " + e.message);
   }
 }
 
 async function cancelarInteresse(leilaoId) {
   try {
     const res = await fetch(`${baseUrl}cancelar_interesse`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ leilao_id: leilaoId, cliente_id: clienteId })
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ leilao_id: leilaoId, cliente_id: clienteId }),
     });
     const data = await res.json();
     alert(data.message);
   } catch (e) {
-    alert('Erro ao cancelar interesse');
+    alert("Erro ao cancelar interesse");
   }
 }
 
@@ -61,18 +61,18 @@ function renderLeiloes(lista) {
     return;
   }
 
-  lista.forEach(l => {
-    const div = document.createElement('div');
+  lista.forEach((l) => {
+    const div = document.createElement("div");
     div.style.marginBottom = "10px";
-    div.textContent = `${l.id} - ${l.nome || ''} (${l.descricao || ''})`;
+    div.textContent = `${l.id} - ${l.nome || ""} (${l.descricao || ""})`;
 
-    const btnRegistrar = document.createElement('button');
-    btnRegistrar.textContent = 'Registrar Interesse';
+    const btnRegistrar = document.createElement("button");
+    btnRegistrar.textContent = "Registrar Interesse";
     btnRegistrar.style.marginLeft = "10px";
     btnRegistrar.onclick = () => registrarInteresse(l.id);
 
-    const btnCancelar = document.createElement('button');
-    btnCancelar.textContent = 'Cancelar Interesse';
+    const btnCancelar = document.createElement("button");
+    btnCancelar.textContent = "Cancelar Interesse";
     btnCancelar.style.marginLeft = "5px";
     btnCancelar.onclick = () => cancelarInteresse(l.id);
 
@@ -109,6 +109,18 @@ function conectarSSE() {
     } catch (e) {
       console.error("Erro ao processar dados SSE:", e);
     }
+  };
+
+  eventSource.onerror = function (event) {
+    console.error("Erro na conexão SSE:", event);
+    if (eventSource.readyState === EventSource.CLOSED) {
+      console.log("SSE desconectado. Tentando reconectar em 5 segundos...");
+      setTimeout(() => conectarSSE(), 5000);
+    }
+  };
+
+  eventSource.onopen = function () {
+    console.log("SSE conectado.");
   };
 }
 

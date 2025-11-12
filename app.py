@@ -7,6 +7,7 @@ import secrets
 import threading
 import pika
 import json
+import redis
 
 # TODO ver com o augusto se ele quer uma pagina so pro lance ou se ele acha mais interessante deixar no index.html tambem
 
@@ -19,7 +20,7 @@ app.secret_key = secrets.token_hex(16)
 CORS(app)
 
 leiloes = []
-interesses = {}
+redis_client = redis.from_url(app.config["REDIS_URL"])
 
 url_mslance = 'http://localhost:4445'
 url_msleilao = 'http://localhost:4447'
@@ -29,20 +30,21 @@ def callback_lance_validado(ch, method, properties, body):
     try:
         data = json.loads(body.decode())
         print(data)
-        print(interesses)
         leilao_id = data.get('leilao_id')
         cliente_id = data.get('user_id')
         valor = data.get('valor')
         with lock:
             with app.app_context():
-                if leilao_id in interesses:
-                    for cid in interesses[leilao_id]:
-                        sse.publish({
-                            'tipo': 'novo_lance_valido',
-                            'leilao_id': leilao_id,
-                            'valor': valor,
-                            'cliente_id_lance': cliente_id
-                        }, channel=cid)
+
+                interessados = redis_client.smembers(f'interesses:{leilao_id}')
+                for cid in interessados:
+                    cid_str = cid.decode('utf-8')
+                    sse.publish({
+                        'tipo': 'novo_lance_valido',
+                        'leilao_id': leilao_id,
+                        'valor': valor,
+                        'cliente_id_lance': cliente_id
+                    }, channel=cid_str)
     except Exception as e:
         print(f'Erro ao processar lance_validado: {e}')
 
@@ -66,23 +68,25 @@ def callback_leilao_vencedor(ch, method, properties, body):
     try:
         data = json.loads(body.decode())
         leilao_id = data.get('leilao_id')
-        id_vencedor = data.get('id_vencedor')
+        id_vencedor = data.get('id_vencedor', 'user_id')
         valor = data.get('valor')
         
         with lock:
-            interessados = interesses.get(leilao_id, set())
+            interessados = redis_client.smembers(f'interesses:{leilao_id}')
             
         with app.app_context():
             for cid in interessados:
+                cid_str = cid.decode('utf-8')
                 sse.publish({
                     'tipo': 'vencedor_leilao',
                     'leilao_id': leilao_id,
                     'id_vencedor': id_vencedor,
                     'valor': valor
-                }, channel=cid)
+                }, channel=cid_str)
     except Exception as e:
         print(f'Erro ao processar leilao_vencedor: {e}')
 
+# TODO olhar tudo que envolve pagamento
 def callback_link_pagamento(ch, method, properties, body):
     print('[App] Recebido em link_pagamento:', body)
     try:
@@ -208,11 +212,7 @@ def registrar_interesse():
         return jsonify({'error': 'leilao_id e cliente_id são obrigatórios'}), 400
     
     with lock:
-        print(leilao_id)
-        if leilao_id not in interesses:
-            interesses[leilao_id] = set()
-        interesses[leilao_id].add(cliente_id)
-        print(interesses)
+        redis_client.sadd(f'interesses:{leilao_id}', cliente_id)
     
     return jsonify({'message': 'Interesse registrado com sucesso'})
 
@@ -226,10 +226,10 @@ def cancelar_interesse():
         return jsonify({'error': 'leilao_id e cliente_id são obrigatórios'}), 400
     
     with lock:
-        if leilao_id in interesses:
-            interesses[leilao_id].discard(cliente_id)
-            if not interesses[leilao_id]:
-                del interesses[leilao_id]
+        redis_client.srem(f'interesses:{leilao_id}', cliente_id)
+
+        if redis_client.scard(f'interesses:{leilao_id}') == 0:
+            redis_client.delete(f'interesses:{leilao_id}')
     
     return jsonify({'message': 'Interesse cancelado com sucesso'})
 
