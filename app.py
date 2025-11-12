@@ -53,22 +53,16 @@ def cadastra_leilao():
         if not item:
             return jsonify({'error': 'item é obrigatório'}), 400
 
-        # determine next id
         next_id = str(max(int(l['id']) for l in leiloes) + 1) if leiloes else '1'
 
         novo = {'id': next_id, 'item': item, 'descricao': descricao, 'valor_inicial': valor_inicial, 'inicio': inicio, 'fim': fim}
 
-        # try to forward to ms_leilao; if it fails, save locally and return a helpful error
         try:
             resp = requests.post(url_msleilao + "/cadastra_leilao", json=novo, timeout=3)
             resp.raise_for_status()
         except RequestException as e:
             app.logger.error("Failed to forward leilao to ms_leilao: %s", e)
-            # keep the leilao locally so the app doesn't lose data while downstream is down
-            leiloes.append(novo)
-            return jsonify({'status': 'saved_locally', 'leilao': novo, 'error': str(e)}), 201
 
-        # on success, also store locally and acknowledge
         leiloes.append(novo)
         return jsonify({'status': 'forwarded', 'leilao': novo}), 201
 

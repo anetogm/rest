@@ -29,12 +29,10 @@ leiloes = [
 	}
 ]
 
-
 channel = None
 lock = threading.Lock()
 
 app = Flask(__name__)
-
 
 def start_consume():
 	global channel, lock
@@ -44,36 +42,29 @@ def start_consume():
 
 		channel.queue_declare(queue='leilao_iniciado')
 		channel.queue_declare(queue='leilao_finalizado')
-		channel.queue_declare(queue='leilao_vencedor')
-		channel.queue_declare(queue='lance_realizado')
-		channel.queue_declare(queue='lance_validado')
+		
 		lock = threading.Lock()
-		print("[ms_leilao] Connected to RabbitMQ")
+
+		threading.Thread(target=channel.start_consuming, daemon=True).start()
 	except Exception as e:
-		# If RabbitMQ isn't available, continue without messaging
-		print(f"[ms_leilao] Warning: unable to connect to RabbitMQ: {e}")
-
-
+		print(f"[ms_leilao] RabbitMQ: {e}")
 
 def cria_leilao():
 	try:
 		data = request.get_json(silent=True) or {}
 		if not data:
-			# fallback to form data
+
 			data = {k: v for k, v in request.form.items()}
 
-		# Accept either 'item' or 'nome' from caller
 		nome = data.get('item') or data.get('nome') or ''
 		descricao = data.get('descricao', '')
 		valor_inicial = data.get('valor_inicial') or data.get('valor') or 0
 		inicio_raw = data.get('inicio', '')
 		fim_raw = data.get('fim', '')
 
-		# compute new id
 		with lock:
 			next_id = max((int(l['id']) for l in leiloes), default=0) + 1
 
-		# parse datetimes safely; if empty, set to now / now + 50min
 		try:
 			inicio_dt = datetime.fromisoformat(inicio_raw) if inicio_raw else datetime.now() + timedelta(seconds=2)
 		except Exception:
@@ -97,7 +88,6 @@ def cria_leilao():
 		with lock:
 			leiloes.append(leilao)
 
-		# start background thread to manage this auction lifecycle
 		t = threading.Thread(target=gerenciar_leilao, args=(leilao,), daemon=True)
 		t.start()
 
@@ -106,6 +96,7 @@ def cria_leilao():
 		return jsonify({"error": str(e)}), 500
 
 def publicar_evento(fila, mensagem):
+    # TODO essa parada é o SSE enviando as notificações
 	try:
 		if channel is None:
 			print(f"[ms_leilao] publish skipped (no channel): {fila} -> {mensagem}")
@@ -116,16 +107,16 @@ def publicar_evento(fila, mensagem):
 	except Exception as e:
 		print(f"[ms_leilao] Error publishing event: {e}")
 
-def publicar_fanout(ex,message):
-	try:
-		if channel is None:
-			print(f"[ms_leilao] fanout skipped (no channel): {ex} -> {message}")
-			return
-		with lock:
-			channel.basic_publish(exchange=ex, routing_key='', body=message)
-			print(f"[x] Evento publicado em fanout: {message}")
-	except Exception as e:
-		print(f"[ms_leilao] Error publishing fanout: {e}")
+def converte_datetime(ativos):
+	res = []
+	for leilao in ativos:
+		item = leilao.copy()
+		for campo in ("inicio", "fim"):
+			valor = item.get(campo)
+			if isinstance(valor, datetime):
+				item[campo] = valor.isoformat()
+		res.append(item)
+	return res
 
 def gerenciar_leilao(leilao):
 	tempo_ate_inicio = (leilao['inicio'] - datetime.now()).total_seconds()
@@ -153,8 +144,51 @@ def main():
 def cadastra():
 	return cria_leilao()
 
+leiloes_ativos = {}
+lances_atuais = {}
+
+@app.get("/leiloes")
+def get_ativos():
+	with lock:
+		snapshot = dict(leiloes_ativos)
+	ativos_dict = esta_ativo(snapshot)
+	ativos_list = converte_datetime(ativos_dict.values())
+	return jsonify(ativos_list)
+
+def esta_ativo(leiloes):
+	agora = datetime.now()
+	ativos = {}
+	for key, leilao in leiloes.items():
+		inicio = leilao.get('inicio')
+		fim = leilao.get('fim')
+
+		if isinstance(inicio, str):
+			try:
+				inicio = datetime.fromisoformat(inicio)
+			except Exception:
+				continue
+		if isinstance(fim, str):
+			try:
+				fim = datetime.fromisoformat(fim)
+			except Exception:
+				continue
+
+		if not isinstance(inicio, datetime) or not isinstance(fim, datetime):
+			continue
+		if inicio >= fim:
+			continue
+		if inicio <= agora < fim:
+			ativos[key] = leilao
+	return ativos
+
 if __name__ == "__main__":
 	print("[MS Leilao] Gerenciando leilões...")
 	threading.Thread(target=start_consume, daemon=True).start()
-	main()
-	app.run(host="127.0.0.1", port=4447, debug=False,use_reloader=False)
+
+	with lock:
+		for l in leiloes:
+			leiloes_ativos[str(l['id'])] = l
+
+	threading.Thread(target=main, daemon=True).start()
+	app.run(host="127.0.0.1", port=4447, debug=False, use_reloader=False)
+ 

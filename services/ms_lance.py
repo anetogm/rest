@@ -5,13 +5,11 @@ import json
 import os
 import threading
 
+lock = threading.Lock()
+app = Flask(__name__)
+
 leiloes_ativos = {}
 lances_atuais = {}
-
-# lock para proteger acessos concorrentes aos dicionários acima
-lock = threading.Lock()
-
-app = Flask(__name__)
 
 def _parse_leilao_body(body: bytes):
     s = body.decode(errors='ignore').strip()
@@ -27,7 +25,6 @@ def _parse_leilao_body(body: bytes):
                 "fim": parts[5].strip() if len(parts) > 5 else None
                 }
 
-
 def callback_lance_realizado(ch, method, properties, body):
     print("Recebido em lance_realizado:", body)
     try:
@@ -35,7 +32,7 @@ def callback_lance_realizado(ch, method, properties, body):
         leilao_id = msg['leilao_id']
         id_cliente = msg['id_cliente']
         valor = msg['valor']
-        # proteger leitura/escrita concorrente
+
         with lock:
             if leilao_id not in leiloes_ativos:
                 print("Leilão não ativo.")
@@ -48,7 +45,6 @@ def callback_lance_realizado(ch, method, properties, body):
             else:
                 valido = False
 
-        # publicar fora do lock
         if valido:
             channel.basic_publish(exchange='', routing_key='lance_validado', body=json.dumps(msg))
             print("Lance válido e registrado.")
@@ -64,7 +60,7 @@ def callback_leilao_iniciado(ch, method, properties, body):
     print(f"\nbody: {body}\n")
     leilao = _parse_leilao_body(body)
     leilao_id = int(leilao.get('id'))
-    # armazenar de forma thread-safe
+    
     with lock:
         leiloes_ativos[leilao_id] = leilao
         snapshot = dict(leiloes_ativos)
@@ -74,7 +70,7 @@ def callback_leilao_iniciado(ch, method, properties, body):
 def callback_leilao_finalizado(ch, method, properties, body):
     print("Recebido em leilao_finalizado:", body)
     leilao_id = int(body.decode().split(',')[0])
-    # remover de forma thread-safe e capturar vencedor, se houver
+
     with lock:
         leiloes_ativos.pop(leilao_id, None)
         vencedor = lances_atuais.pop(leilao_id, None)
@@ -84,58 +80,16 @@ def callback_leilao_finalizado(ch, method, properties, body):
         channel.basic_publish(exchange='', routing_key='leilao_vencedor', body=msg_vencedor)
         print(f"Vencedor publicado: {msg_vencedor}")
 
-
-
-@app.get("/leiloes")
-def get_ativos():
-    try:
-        with lock:
-            snapshot = leiloes_ativos
-        snapshot = esta_ativo(snapshot)
-        ativos = converte_datetime(snapshot)
-        return jsonify(ativos)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-def converte_datetime(ativos):
-    converted = []
-    for l in ativos:
-        item = l.copy()
-        inicio = item.get('inicio')
-        fim = item.get('fim')
-
-        # convert datetime or date to ISO string; leave other types unchanged
-        if isinstance(inicio, (datetime,)):
-            item['inicio'] = inicio.isoformat()
-        if isinstance(fim, (datetime,)):
-            item['fim'] = fim.isoformat()
-
-        converted.append(item)
-    return converted
-    
-def esta_ativo(leiloes):
-    agora = datetime.now()
-    leilao_aux = {}
-    for leilao in leiloes:
-        print(f"{leiloes[leilao]['fim']} &&  {agora}")
-        print(f"{type(leiloes[leilao]['fim'])} &&  {type(agora)}")
-        fim = datetime.fromisoformat(leiloes[leilao]['fim'])
-        print(type(fim))
-        print(f"fim: {fim}  agora: {agora}")
-        if fim > agora:
-            leilao_aux[leilao['id']] = leilao
-    return leilao_aux
-            
 def start_consumer():
     global channel
     connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
     channel = connection.channel()
+    channel.queue_declare(queue='leilao_vencedor')
     channel.queue_declare(queue='lance_validado')
     channel.queue_declare(queue='lance_invalidado')
-    channel.queue_declare(queue='leilao_vencedor')
+    
     channel.basic_consume(queue='leilao_iniciado', on_message_callback=callback_leilao_iniciado, auto_ack=True)
     channel.basic_consume(queue='leilao_finalizado', on_message_callback=callback_leilao_finalizado, auto_ack=True)
-    channel.basic_consume(queue='lance_realizado', on_message_callback=callback_lance_realizado, auto_ack=True)
     print(' [*] Consumer started. Waiting messages.')
     channel.start_consuming()
 
@@ -143,5 +97,4 @@ if __name__ == "__main__":
     t = threading.Thread(target=start_consumer, daemon=True)
     t.start()
 
-    # run Flask app in main thread so it is reachable on port 4445
     app.run(host="127.0.0.1", port=4445, debug=False,use_reloader=False)

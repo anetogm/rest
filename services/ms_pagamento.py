@@ -8,7 +8,6 @@ from flask import Flask, request, jsonify
 connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
 channel = connection.channel()
 
-channel.queue_declare(queue='leilao_vencedor')
 channel.queue_declare(queue='link_pagamento')
 channel.queue_declare(queue='status_pagamento')
 
