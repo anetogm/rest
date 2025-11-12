@@ -1,6 +1,5 @@
 let baseUrl = "http://localhost:4444/";
 let clienteId = getUserIdFromSessionStorage();
-let eventSource;
 
 function nowForDatetimeLocal() {
   const now = new Date();

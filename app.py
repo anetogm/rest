@@ -28,20 +28,21 @@ def callback_lance_validado(ch, method, properties, body):
     print('[App] Recebido em lance_validado:', body)
     try:
         data = json.loads(body.decode())
+        print(data)
+        print(interesses)
         leilao_id = data.get('leilao_id')
-        cliente_id = data.get('user_id')  # Cliente que fez o lance
+        cliente_id = data.get('user_id')
         valor = data.get('valor')
-        
         with lock:
-            print(interesses)
-            interessados = interesses.get(leilao_id, set())
-        for cid in interessados:
-            sse.publish({
-                'tipo': 'novo_lance_valido',
-                'leilao_id': leilao_id,
-                'valor': valor,
-                'cliente_id_lance': cliente_id
-            }, channel=cid)
+            with app.app_context():
+                if leilao_id in interesses:
+                    for cid in interesses[leilao_id]:
+                        sse.publish({
+                            'tipo': 'novo_lance_valido',
+                            'leilao_id': leilao_id,
+                            'valor': valor,
+                            'cliente_id_lance': cliente_id
+                        }, channel=cid)
     except Exception as e:
         print(f'Erro ao processar lance_validado: {e}')
 
@@ -51,11 +52,12 @@ def callback_lance_invalidado(ch, method, properties, body):
         data = json.loads(body.decode())
         cliente_id = data.get('user_id')
         
-        sse.publish({
-            'tipo': 'lance_invalido',
-            'leilao_id': data.get('leilao_id'),
-            'valor': data.get('valor')
-        }, channel=cliente_id)
+        with app.app_context():
+            sse.publish({
+                'tipo': 'lance_invalido',
+                'leilao_id': data.get('leilao_id'),
+                'valor': data.get('valor')
+            }, channel=cliente_id)
     except Exception as e:
         print(f'Erro ao processar lance_invalidado: {e}')
 
@@ -67,16 +69,17 @@ def callback_leilao_vencedor(ch, method, properties, body):
         id_vencedor = data.get('id_vencedor')
         valor = data.get('valor')
         
-        # Notificação: Vencedor do leilão (apenas aos interessados no leilao_id)
         with lock:
             interessados = interesses.get(leilao_id, set())
-        for cid in interessados:
-            sse.publish({
-                'tipo': 'vencedor_leilao',
-                'leilao_id': leilao_id,
-                'id_vencedor': id_vencedor,
-                'valor': valor
-            }, channel=cid)
+            
+        with app.app_context():
+            for cid in interessados:
+                sse.publish({
+                    'tipo': 'vencedor_leilao',
+                    'leilao_id': leilao_id,
+                    'id_vencedor': id_vencedor,
+                    'valor': valor
+                }, channel=cid)
     except Exception as e:
         print(f'Erro ao processar leilao_vencedor: {e}')
 
@@ -87,10 +90,11 @@ def callback_link_pagamento(ch, method, properties, body):
         cliente_id = data.get('cliente_id')  
         link = data.get('link')
         
-        sse.publish({
-            'tipo': 'link_pagamento',
-            'link': link
-        }, channel=cliente_id)
+        with app.app_context():
+            sse.publish({
+                'tipo': 'link_pagamento',
+                'link': link
+            }, channel=cliente_id)
     except Exception as e:
         print(f'Erro ao processar link_pagamento: {e}')
 
@@ -101,10 +105,11 @@ def callback_status_pagamento(ch, method, properties, body):
         cliente_id = data.get('cliente_id')
         status = data.get('status')
         
-        sse.publish({
-            'tipo': 'status_pagamento',
-            'status': status
-        }, channel=cliente_id)
+        with app.app_context():
+            sse.publish({
+                'tipo': 'status_pagamento',
+                'status': status
+            }, channel=cliente_id)
     except Exception as e:
         print(f'Erro ao processar status_pagamento: {e}')
 
@@ -195,7 +200,6 @@ def pagamento():
 
 @app.post("/registrar_interesse")
 def registrar_interesse():
-    # TODO contextualizar pro augusto que de alguma maneira ele nao ta printando os interesses
     data = request.get_json()
     leilao_id = data.get('leilao_id')
     cliente_id = data.get('cliente_id')
@@ -207,8 +211,8 @@ def registrar_interesse():
         print(leilao_id)
         if leilao_id not in interesses:
             interesses[leilao_id] = set()
-            print(interesses)
         interesses[leilao_id].add(cliente_id)
+        print(interesses)
     
     return jsonify({'message': 'Interesse registrado com sucesso'})
 
