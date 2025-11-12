@@ -99,12 +99,20 @@ def get_ativos():
         return jsonify({"error": str(e)}), 500
 
 def converte_datetime(ativos):
+    converted = []
     for l in ativos:
-        if isinstance(ativos[l]['inicio'], datetime):
-            ativos[l]['inicio'] = ativos[l]['inicio'].isoformat()
-        if isinstance(ativos[l]['fim'], datetime):
-            ativos[l]['fim'] = ativos[l]['fim'].isoformat()
-    return ativos
+        item = l.copy()
+        inicio = item.get('inicio')
+        fim = item.get('fim')
+
+        # convert datetime or date to ISO string; leave other types unchanged
+        if isinstance(inicio, (datetime,)):
+            item['inicio'] = inicio.isoformat()
+        if isinstance(fim, (datetime,)):
+            item['fim'] = fim.isoformat()
+
+        converted.append(item)
+    return converted
     
 def esta_ativo(leiloes):
     agora = datetime.now()

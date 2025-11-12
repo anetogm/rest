@@ -1,8 +1,9 @@
 import pika
 import time
-import flask
 from datetime import datetime, timedelta
 import threading
+from datetime import datetime
+from flask import Flask ,jsonify,request
 
 inicio = datetime.now() + timedelta(seconds=2)
 fim = inicio + timedelta(minutes=50)
@@ -29,21 +30,40 @@ leiloes = [
 	}
 ]
 
-connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
-channel = connection.channel()
+app = Flask(__name__)
 
-channel.exchange_declare(exchange='inicio', exchange_type='fanout')
+def start_consume():
+	global channel,lock
+	connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+	channel = connection.channel()
 
-channel.queue_declare(queue='leilao_iniciado')
-channel.queue_declare(queue='leilao_finalizado')
-channel.queue_declare(queue='leilao_vencedor')
-channel.queue_declare(queue='lance_realizado')
-channel.queue_declare(queue='lance_validado')
+	channel.queue_declare(queue='leilao_iniciado')
+	channel.queue_declare(queue='leilao_finalizado')
+	channel.queue_declare(queue='leilao_vencedor')
+	channel.queue_declare(queue='lance_realizado')
+	channel.queue_declare(queue='lance_validado')
+	lock = threading.Lock()
 
-lock = threading.Lock()
+
 
 def cria_leilao():
-	return 1
+	try:
+		data = request.json
+		leilao_id = cria_leilao()
+		leilao = {
+			'id': leilao_id,
+			'nome': data['nome'],
+			'descricao': data['descricao'],
+			'valor_inicial': data['valor_inicial'],
+			'inicio': datetime.fromisoformat(data['inicio']),
+			'fim': datetime.fromisoformat(data['fim']),
+			'status': 'ativo'
+		}
+		with lock:
+			leiloes.append(leilao)
+		return jsonify({"message": "Leilão cadastrado com sucesso", "leilao_id": leilao_id}), 201
+	except Exception as e:
+		return jsonify({"error": str(e)}), 500
 
 def publicar_evento(fila, mensagem):
     with lock:
@@ -77,6 +97,12 @@ def main():
 	for t in threads:
 		t.join()
 
+@app.post("/cadastra_leilao")
+def cadastra():
+	return cria_leilao()
+
 if __name__ == "__main__":
 	print("[MS Leilao] Gerenciando leilões...")
+	threading.Thread(target=start_consume, daemon=True).start()
 	main()
+	app.run(host="127.0.0.1", port=4447, debug=False,use_reloader=False)

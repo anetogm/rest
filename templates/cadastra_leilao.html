@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Cadastrar Leilão</title>
+    <style>
+        body { font-family: Arial, Helvetica, sans-serif; padding: 20px; background:#f7f7f7; }
+        .container { max-width:600px; margin:0 auto; background:#fff; padding:20px; border-radius:6px; box-shadow:0 2px 6px rgba(0,0,0,.1); }
+        label { display:block; margin-top:12px; font-weight:600; }
+        input, textarea, select { width:100%; padding:8px; margin-top:6px; box-sizing:border-box; border:1px solid #ccc; border-radius:4px; }
+        textarea { min-height:100px; resize:vertical; }
+        .row { display:flex; gap:10px; }
+        .row > * { flex:1; }
+        button { margin-top:16px; padding:10px 14px; background:#0078d4; color:#fff; border:none; border-radius:4px; cursor:pointer; }
+        button:hover { background:#005a9e; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Cadastrar Leilão</h1>
+        <form id="cadastraLeilaoForm" action="localhost:4444/cadastra_leilao" method="post">
+            <label for="item">Item</label>
+            <input id="item" name="item" type="text" required />
+
+            <label for="descricao">Descrição</label>
+            <textarea id="descricao" name="descricao" required></textarea>
+
+            <div class="row">
+                <div>
+                    <label for="preco_inicial">Preço inicial (R$)</label>
+                    <input id="preco_inicial" name="preco_inicial" type="number" step="0.01" min="0" required />
+                </div>
+            </div>
+
+            <div class="row">
+                <div>
+                    <label for="data_inicio">Data/hora início</label>
+                    <input id="data_inicio" name="data_inicio" type="datetime-local" required />
+                </div>
+                <div>
+                    <label for="data_fim">Data/hora término</label>
+                    <input id="data_fim" name="data_fim" type="datetime-local" required />
+                </div>
+            </div>
+            <button type="submit">Cadastrar Leilão</button>
+        </form>
+    </div>
+</body>
+</html></div>

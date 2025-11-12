@@ -14,6 +14,7 @@ leiloes = [{"id": "1", "item": "relogio", "descricao": "Relogio de pulso", "valo
            {"id": "2", "item": "lampada", "descricao": "Lampada LED", "valor_inicial": 50, "inicio": inicio, "fim": fim}]
 
 url_mslance = 'http://localhost:4445'
+url_msleilao = 'http://localhost:4447'
 
 @app.get("/")
 def index():
@@ -31,21 +32,24 @@ def get_leiloes():
 
 @app.get("/leiloes/<int:leilao_id>")
 def get_leiloes1(leilao_id: int):
-    # TODO implementar leitura das filas do rabbitmq pra ele so mostrar os leiloes ativos
     for leilao in leiloes: 
      if int(leilao["id"]) == leilao_id:  
         return jsonify(leilao)
-    return {'error': 'leilao nao encontrado'}
+    return render_template("index.html")
 
+@app.get("/cadastra_leilao")
+def cadastra_leilao_page():
+    return render_template("cadastra_leilao.html")
 
-@app.post("/leiloes")
-def add_leilao():
-    data = request.get_json(silent=True) or {}
-    item = (data.get('item') or '').strip()
-    descricao = data.get('descricao', '')
-    valor_inicial = data.get('valor_inicial', 0)
-    inicio = data.get('inicio', '')
-    fim = data.get('fim', '')
+@app.post("/cadastra_leilao")
+def cadastra_leilao():
+    print(request.form.get('item'))
+    print(f"Esse é a data: {request.form}")
+    item = (request.form.get('item'))
+    descricao = request.form.get('descricao', '')
+    valor_inicial = request.form.get('valor_inicial', 0)
+    inicio = request.form.get('inicio', '')
+    fim = request.form.get('fim', '')
     
     if not item:
         return jsonify({'error': 'item é obrigatório'}), 400
@@ -55,8 +59,8 @@ def add_leilao():
     next_id = str(max(int(l['id']) for l in leiloes) + 1) if leiloes else '1'
 
     novo = { 'id': next_id, 'item': item, 'descricao': descricao, 'valor_inicial': valor_inicial, 'inicio': inicio, 'fim': fim}
-    leiloes.append(novo)
-    return jsonify(novo), 201
+    requests.post(url_msleilao + "/cadastra_leilao", json=novo)
+    #sse.publish_event('leilao_iniciado', novo)
 
 @app.post("/pagamento")
 def pagamento():
