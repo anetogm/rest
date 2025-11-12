@@ -6,7 +6,6 @@ from flask import Flask, jsonify, request
 
 inicio = datetime.now() + timedelta(seconds=2)
 fim = inicio + timedelta(minutes=50)
-fim_inativo = inicio - timedelta(minutes=10)
 
 leiloes = [
 	{
@@ -24,7 +23,7 @@ leiloes = [
 		'descricao': 'Iphone 17 Pro Max Turbo assinado pelo Steve Jobs',
 		'valor_inicial': 2000,
 		'inicio': inicio,
-        'fim': fim_inativo,
+        'fim': fim,
 		'status': 'ativo'
 	}
 ]

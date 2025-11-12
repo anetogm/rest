@@ -64,16 +64,25 @@ async function buscaLeiloes() {
 }
 
 function renderLeiloes(lista) {
+  const demoEl = document.getElementById("demo");
+
   if (lista.length === 0) {
-    document.getElementById("demo").textContent = "Nenhum leilão ativo";
+    demoEl.style.whiteSpace = "normal";
+    demoEl.textContent = "Nenhum leilão ativo";
     return;
   }
+
+  demoEl.style.whiteSpace = "pre-line";
+
   let texto = "";
   for (let i = 0; i < lista.length; i++) {
     const l = lista[i];
-    texto += l.id + " - " + (l.item || l.descricao || "") + "\n";
+    const nome = l.nome || "";
+    const descricao = l.descricao || "";
+    texto += `${l.id} - ${nome} (${descricao})\n`;
   }
-  document.getElementById("demo").textContent = texto;
+
+  demoEl.textContent = texto;
 }
 
 window.addEventListener("load", () => {

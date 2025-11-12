@@ -8,11 +8,7 @@ from datetime import datetime, timedelta
 app = Flask(__name__)
 CORS(app) 
 
-inicio = datetime.now() + timedelta(seconds=2)
-fim = inicio + timedelta(minutes=50) 
-
-leiloes = [{"id": "1", "item": "relogio", "descricao": "Relogio de pulso", "valor_inicial": 100, "inicio": inicio, "fim": fim},
-           {"id": "2", "item": "lampada", "descricao": "Lampada LED", "valor_inicial": 50, "inicio": inicio, "fim": fim}]
+leiloes = []
 
 url_mslance = 'http://localhost:4445'
 url_msleilao = 'http://localhost:4447'
@@ -27,16 +23,14 @@ def pagamento_page():
 
 @app.get("/leiloes")
 def get_leiloes():
-    leiloes = requests.get(url_mslance + "/leiloes")
+    leiloes = requests.get(url_msleilao + "/leiloes")
     print(f"leiloes: {leiloes.json()}")
     return jsonify(leiloes.json())
 
 @app.get("/leiloes/<int:leilao_id>")
 def get_leiloes1(leilao_id: int):
-    for leilao in leiloes: 
-     if int(leilao["id"]) == leilao_id:  
-        return jsonify(leilao)
-    return render_template("index.html")
+    # TODO acho que se pá é BO do ms_leilao e nao do app.py
+    return
 
 @app.get("/cadastra_leilao")
 def cadastra_leilao_page():
@@ -54,20 +48,17 @@ def cadastra_leilao():
             return jsonify({'error': 'item é obrigatório'}), 400
 
         next_id = str(max(int(l['id']) for l in leiloes) + 1) if leiloes else '1'
-
         novo = {'id': next_id, 'item': item, 'descricao': descricao, 'valor_inicial': valor_inicial, 'inicio': inicio, 'fim': fim}
 
-        try:
-            resp = requests.post(url_msleilao + "/cadastra_leilao", json=novo, timeout=3)
-            resp.raise_for_status()
-        except RequestException as e:
-            app.logger.error("Failed to forward leilao to ms_leilao: %s", e)
+        resp = requests.post(url_msleilao + "/cadastra_leilao", json=novo, timeout=3)
+        resp.raise_for_status()
 
         leiloes.append(novo)
         return jsonify({'status': 'forwarded', 'leilao': novo}), 201
 
 @app.post("/pagamento")
 def pagamento():
+    # TODO ver isso depois
     return pagamento
 
 if __name__ == "__main__":

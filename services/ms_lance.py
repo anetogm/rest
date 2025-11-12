@@ -25,35 +25,6 @@ def _parse_leilao_body(body: bytes):
                 "fim": parts[5].strip() if len(parts) > 5 else None
                 }
 
-def callback_lance_realizado(ch, method, properties, body):
-    print("Recebido em lance_realizado:", body)
-    try:
-        msg = json.loads(body.decode())
-        leilao_id = msg['leilao_id']
-        id_cliente = msg['id_cliente']
-        valor = msg['valor']
-
-        with lock:
-            if leilao_id not in leiloes_ativos:
-                print("Leilão não ativo.")
-                return
-
-            atual = lances_atuais.get(leilao_id)
-            if (atual is None) or (valor > atual.get('valor', 0)):
-                lances_atuais[leilao_id] = {'id_cliente': id_cliente, 'valor': valor}
-                valido = True
-            else:
-                valido = False
-
-        if valido:
-            channel.basic_publish(exchange='', routing_key='lance_validado', body=json.dumps(msg))
-            print("Lance válido e registrado.")
-        else:
-            channel.basic_publish(exchange='', routing_key='lance_invalidado', body=json.dumps(msg))
-            print("Lance não é maior que o atual.")
-    except Exception as e:
-        print(f"Erro ao processar lance: {e}")
-
 def callback_leilao_iniciado(ch, method, properties, body):
     print("Recebido em leilao_iniciado:", body)
     print(f"callback_leilao_iniciado PID={os.getpid()} thread={threading.current_thread().name}")
