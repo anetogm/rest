@@ -68,15 +68,12 @@ def callback_leilao_vencedor(ch, method, properties, body):
     except Exception as e:
         print(f"[Pagamento] Erro ao processar mensagem: {e}")
 
-
 def iniciar_consumidor():
     channel.basic_consume(queue='leilao_vencedor', on_message_callback=callback_leilao_vencedor, auto_ack=True)
     print("[Pagamento] Consumindo leilao_vencedor.")
     channel.start_consuming()
 
-
 app = Flask(__name__)
-
 
 @app.post('/webhook/pagamento')
 def webhook_pagamento():
@@ -105,16 +102,12 @@ def webhook_pagamento():
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
-
 @app.get('/healthz')
 def healthz():
     return jsonify({'status': 'ok'})
-
 
 if __name__ == '__main__':
     t = threading.Thread(target=iniciar_consumidor, daemon=True)
     t.start()
     print('[Pagamento] Servindo webhook em http://127.0.0.1:4446')
     app.run(host='127.0.0.1', port=4446, debug=True)
-
-

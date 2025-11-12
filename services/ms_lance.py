@@ -1,15 +1,12 @@
 import datetime
 from flask import Flask ,jsonify
 import pika
-import base64
 import json
-import os
 
 leiloes_ativos = {}
 lances_atuais = {}
 
 app = Flask(__name__)
-
 
 def callback_lance_realizado(ch, method, properties, body):
     print("Recebido em lance_realizado:", body)
@@ -40,8 +37,10 @@ def callback_leilao_iniciado(ch, method, properties, body):
 def callback_leilao_finalizado(ch, method, properties, body):
     print("Recebido em leilao_finalizado:", body)
     leilao_id = int(body.decode().split(';')[0])
+    
     if leilao_id in leiloes_ativos:
         del leiloes_ativos[leilao_id]
+        
     if leilao_id in lances_atuais:
         vencedor = lances_atuais[leilao_id]
         msg_vencedor = json.dumps({'leilao_id': leilao_id, 'id_vencedor': vencedor['id_cliente'], 'valor': vencedor['valor']})
@@ -51,7 +50,6 @@ def callback_leilao_finalizado(ch, method, properties, body):
 
 connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
 channel = connection.channel()
-
 
 channel.queue_declare(queue='lance_validado')
 channel.queue_declare(queue='lance_invalidado')
