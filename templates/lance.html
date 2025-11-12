@@ -8,9 +8,9 @@
     <h1>Fazer Lance em Leilão</h1>
     <form id="lanceForm">
       <label for="leilaoId">ID do Leilão:</label>
-      <input type="number" id="leilaoId" required><br><br>
+      <input type="number" id="leilaoId" required /><br /><br />
       <label for="valorLance">Valor do Lance:</label>
-      <input type="number" step="0.01" id="valorLance" required><br><br>
+      <input type="number" step="0.01" id="valorLance" required /><br /><br />
       <button type="button" onclick="fazerLance()">Enviar Lance</button>
     </form>
     <p id="resultado"></p>
@@ -19,13 +19,24 @@
     <script>
       let baseUrl = "http://localhost:4444/";
 
+      // Função para gerar ou obter user_id único por aba
+      function getUserIdFromSessionStorage() {
+        let userId = sessionStorage.getItem("userId");
+        if (!userId) {
+          userId = crypto.randomUUID(); // Gera UUID único
+          sessionStorage.setItem("userId", userId);
+        }
+        return userId;
+      }
+
       async function fazerLance() {
         const leilaoId = document.getElementById("leilaoId").value;
         const valorLance = document.getElementById("valorLance").value;
-        const userId = getUserIdFromSession();
+        const userId = getUserIdFromSessionStorage(); // Obtém ID único por aba
 
-        if (!leilaoId || !valorLance || !userId) {
-          document.getElementById("resultado").textContent = "Preencha todos os campos.";
+        if (!leilaoId || !valorLance) {
+          document.getElementById("resultado").textContent =
+            "Preencha todos os campos.";
           return;
         }
 
@@ -33,17 +44,19 @@
           const res = await fetch(baseUrl + "lance", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ leilao_id: leilaoId, user_id: userId, valor: parseFloat(valorLance) })
+            body: JSON.stringify({
+              leilao_id: leilaoId,
+              user_id: userId,
+              valor: parseFloat(valorLance),
+            }),
           });
           const result = await res.json();
-          document.getElementById("resultado").textContent = result.message || "Lance enviado!";
+          document.getElementById("resultado").textContent =
+            result.message || "Lance enviado!";
         } catch (e) {
-          document.getElementById("resultado").textContent = "Erro ao fazer lance: " + e.message;
+          document.getElementById("resultado").textContent =
+            "Erro ao fazer lance: " + e.message;
         }
-      }
-
-      function getUserIdFromSession() {
-        return localStorage.getItem("userId") || "1"; // Substitua por lógica real para pegar da sessão
       }
     </script>
   </body>
