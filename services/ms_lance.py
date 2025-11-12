@@ -35,7 +35,6 @@ def callback_leilao_iniciado(ch, method, properties, body):
     with lock:
         leiloes_ativos[leilao_id] = leilao
         snapshot = dict(leiloes_ativos)
-        print(f"[DEBUG] leiloes_ativos id={id(leiloes_ativos)} keys={list(leiloes_ativos.keys())}")
         print(f"Leilão adicionado aos ativos: {snapshot}")
 
 def callback_leilao_finalizado(ch, method, properties, body):
@@ -67,22 +66,24 @@ def start_consumer():
 @app.post("/lance")
 def receber_lance():
     data = request.get_json()
-    print(f"\n\n\n\n\nRecebido lance: {data}")
     leilao_id = int(data.get('leilao_id'))
     user_id = data.get('user_id')
     valor = float(data.get('valor'))
     
     with lock:
-        if leilao_id not in leiloes_ativos:
+        msg = json.dumps({'leilao_id': leilao_id, 'user_id': user_id, 'valor': valor})
+        
+        if (leilao_id not in leiloes_ativos.keys()):
+            channel.basic_publish(exchange='', routing_key='lance_invalidado', body=msg)
             return jsonify({'error': 'Leilão não ativo'}), 400
         
         lance_atual = lances_atuais.get(leilao_id)
         if lance_atual and valor <= lance_atual['valor']:
+            channel.basic_publish(exchange='', routing_key='lance_invalidado', body=msg)
             return jsonify({'error': 'Lance deve ser maior que o atual'}), 400
         
         lances_atuais[leilao_id] = {'id_cliente': user_id, 'valor': valor}
         
-        msg = json.dumps({'leilao_id': leilao_id, 'user_id': user_id, 'valor': valor})
         channel.basic_publish(exchange='', routing_key='lance_validado', body=msg)
         
     return jsonify({'message': 'Lance validado'})

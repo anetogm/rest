@@ -2,9 +2,12 @@ from flask import Flask, jsonify, render_template, request, redirect
 from flask_cors import CORS
 import requests
 import secrets
+import threading
+import pika
 
 # TODO ver com o augusto se ele quer uma pagina so pro lance ou se ele acha mais interessante deixar no index.html tambem
 
+lock = threading.Lock()
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
 CORS(app)
@@ -13,6 +16,38 @@ leiloes = []
 
 url_mslance = 'http://localhost:4445'
 url_msleilao = 'http://localhost:4447'
+
+def callback_lance_validado(ch, method, properties, body):
+    print('[App] Recebido em lance_validado:', body)
+    
+def callback_lance_invalidado(ch, method, properties, body):
+    print('[App] Recebido em lance_invalidado:', body)
+    
+def callback_leilao_vencedor(ch, method, properties, body):
+    print('[App] Recebido em leilao_vencedor:', body)
+    
+def callback_link_pagamento(ch, method, properties, body):
+    print('[App] Recebido em link_pagamento:', body)
+    
+def callback_status_pagamento(ch, method, properties, body):
+    print('[App] Recebido em status_pagamento:', body)
+
+def start_consumer():
+    global channel
+    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    channel = connection.channel()
+
+    channel.basic_consume(queue='lance_validado', on_message_callback=callback_lance_validado, auto_ack=True)
+    channel.basic_consume(queue='lance_invalidado', on_message_callback=callback_lance_invalidado, auto_ack=True)
+    channel.basic_consume(queue='leilao_vencedor', on_message_callback=callback_leilao_vencedor, auto_ack=True)
+    
+    # TODO verificar a parte de pagamento depois
+    # só descomentar quando tiver o ms_pagamento rodando de fato
+    #channel.basic_consume(queue='link_pagamento', on_message_callback=callback_link_pagamento, auto_ack=True)
+    #channel.basic_consume(queue='status_pagamento', on_message_callback=callback_status_pagamento, auto_ack=True)
+    
+    print(' [*] Consumer started. Waiting messages.')
+    channel.start_consuming()
 
 @app.get("/")
 def index():
@@ -62,6 +97,7 @@ def cadastra_leilao():
         return redirect("/cadastra_leilao?success=1")
 
 @app.post("/lance")
+# TODO ver a parte de pegar o user id (nao ta dando certo desse jeito)
 def lance():
     data = request.get_json()
     leilao_id = data.get("leilao_id")
@@ -83,4 +119,7 @@ def pagamento():
     return pagamento
 
 if __name__ == "__main__":
+    t = threading.Thread(target=start_consumer, daemon=True)
+    t.start()
+    
     app.run(host="127.0.0.1", port=4444, debug=True)

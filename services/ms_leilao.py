@@ -150,8 +150,6 @@ def get_ativos():
 	ativos = converte_datetime(ativos)
 	return jsonify(ativos)
 
-from datetime import datetime
-
 def esta_ativo(leiloes):
     agora = datetime.now()
     ativos = []
