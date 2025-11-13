@@ -11,6 +11,13 @@ app = Flask(__name__)
 leiloes_ativos = {}
 lances_atuais = {}
 
+# Conexão separada para consumer (thread dedicada)
+consumer_channel = None
+# Conexão separada para publisher (Flask thread)
+publisher_connection = None
+publisher_channel = None
+publisher_lock = threading.Lock()
+
 def _parse_leilao_body(body: bytes):
     s = body.decode(errors='ignore').strip()
     parts = s.split(',')
@@ -47,23 +54,69 @@ def callback_leilao_finalizado(ch, method, properties, body):
 
     if vencedor:
         msg_vencedor = json.dumps({'leilao_id': leilao_id, 'id_vencedor': vencedor['id_cliente'], 'valor': vencedor['valor']})
-        channel.basic_publish(exchange='', routing_key='leilao_vencedor', body=msg_vencedor)
+        # Usar o próprio canal do consumer para publicar (mesma thread)
+        publicar_fanout('leilao_vencedor', msg_vencedor)
         print(f"Vencedor publicado: {msg_vencedor}")
 
 def start_consumer():
-    global channel
+    global consumer_channel
     connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
-    channel = connection.channel()
-    channel.queue_declare(queue='leilao_iniciado')
-    channel.queue_declare(queue='leilao_finalizado')
-    channel.queue_declare(queue='leilao_vencedor')
-    channel.queue_declare(queue='lance_validado')
-    channel.queue_declare(queue='lance_invalidado')
+    consumer_channel = connection.channel()
+    consumer_channel.queue_declare(queue='leilao_iniciado')
+    consumer_channel.queue_declare(queue='leilao_finalizado')
+    consumer_channel.queue_declare(queue='lance_validado')
+    consumer_channel.queue_declare(queue='lance_invalidado')
     
-    channel.basic_consume(queue='leilao_iniciado', on_message_callback=callback_leilao_iniciado, auto_ack=True)
-    channel.basic_consume(queue='leilao_finalizado', on_message_callback=callback_leilao_finalizado, auto_ack=True)
+    consumer_channel.basic_consume(queue='leilao_iniciado', on_message_callback=callback_leilao_iniciado, auto_ack=True)
+    consumer_channel.basic_consume(queue='leilao_finalizado', on_message_callback=callback_leilao_finalizado, auto_ack=True)
     print(' [*] Consumer started. Waiting messages.')
-    channel.start_consuming()
+    consumer_channel.start_consuming()
+
+def publish_message(routing_key, message):
+    """Função helper para publicar mensagens usando conexão dedicada"""
+    global publisher_connection, publisher_channel
+    
+    with publisher_lock:
+        try:
+            # Criar/recriar conexão se necessário
+            if publisher_connection is None or publisher_connection.is_closed:
+                publisher_connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+                publisher_channel = publisher_connection.channel()
+                publisher_channel.queue_declare(queue='lance_validado')
+                publisher_channel.queue_declare(queue='lance_invalidado')
+            
+            publisher_channel.basic_publish(exchange='', routing_key=routing_key, body=message)
+            return True
+        except Exception as e:
+            print(f"[ms_lance] Error publishing: {e}")
+            # Resetar conexão em caso de erro
+            publisher_connection = None
+            publisher_channel = None
+            return False
+
+def publicar_fanout(exchange, message):
+    """Publica mensagem em exchange fanout"""
+    global publisher_connection, publisher_channel
+    
+    with publisher_lock:
+        try:
+            # Criar/recriar conexão se necessário
+            if publisher_connection is None or publisher_connection.is_closed:
+                publisher_connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+                publisher_channel = publisher_connection.channel()
+                publisher_channel.exchange_declare(exchange='leilao_vencedor', exchange_type='fanout')
+            result = publisher_channel.queue_declare(queue='', exclusive=True)
+            queue_name = result.method.queue
+            publisher_channel.queue_bind(exchange='leilao_vencedor', queue=queue_name)
+            
+            publisher_channel.basic_publish(exchange=exchange, routing_key='', body=message)
+            return True
+        except Exception as e:
+            print(f"[ms_lance] Error publishing to fanout: {e}")
+            # Resetar conexão em caso de erro
+            publisher_connection = None
+            publisher_channel = None
+            return False                            
 
 @app.post("/lance")
 def receber_lance():
@@ -72,27 +125,32 @@ def receber_lance():
     user_id = data.get('user_id')
     valor = float(data.get('valor'))
     
+    msg = json.dumps({'leilao_id': leilao_id, 'user_id': user_id, 'valor': valor})
+    
     with lock:
-        msg = json.dumps({'leilao_id': leilao_id, 'user_id': user_id, 'valor': valor})
-        
         if (leilao_id not in leiloes_ativos.keys()):
-            channel.basic_publish(exchange='', routing_key='lance_invalidado', body=msg)
+            publish_message('lance_invalidado', msg)
+            print("To publicando aqui")
             return jsonify({'error': 'Leilão não ativo'}), 400
         
         lance_atual = lances_atuais.get(leilao_id)
         if lance_atual and valor <= lance_atual['valor']:
-            channel.basic_publish(exchange='', routing_key='lance_invalidado', body=msg)
+            print("To publicando lá")
+            publish_message('lance_invalidado', msg)
             return jsonify({'error': 'Lance deve ser maior que o atual'}), 400
         
         lances_atuais[leilao_id] = {'id_cliente': user_id, 'valor': valor}
-        
-        channel.basic_publish(exchange='', routing_key='lance_validado', body=msg)
-        
+    
+    publish_message('lance_validado', msg)
     return jsonify({'message': 'Lance validado'})
 
 
 if __name__ == "__main__":
+    import time
+    
+    # Iniciar consumer em thread separada
     t = threading.Thread(target=start_consumer, daemon=True)
     t.start()
+    time.sleep(1)  # Give RabbitMQ time to connect
 
-    app.run(host="127.0.0.1", port=4445, debug=False,use_reloader=False)
+    app.run(host="127.0.0.1", port=4445, debug=False, use_reloader=False)

@@ -12,6 +12,8 @@ import redis
 # TODO ver com o augusto se ele quer uma pagina so pro lance ou se ele acha mais interessante deixar no index.html tambem
 
 lock = threading.Lock()
+rabbitmq_lock = threading.Lock()
+channel = None
 app = Flask(__name__)
 app.config["REDIS_URL"] = "redis://localhost:6379/0"
 app.register_blueprint(sse, url_prefix='/stream')
@@ -70,6 +72,7 @@ def callback_leilao_vencedor(ch, method, properties, body):
         leilao_id = data.get('leilao_id')
         id_vencedor = data.get('id_vencedor', 'user_id')
         valor = data.get('valor')
+        print(f"Isso é o ganhador {id_vencedor} && {valor}")
         
         with lock:
             interessados = redis_client.smembers(f'interesses:{leilao_id}')
@@ -108,6 +111,7 @@ def callback_status_pagamento(ch, method, properties, body):
         data = json.loads(body.decode())
         cliente_id = data.get('cliente_id')
         status = data.get('status')
+        print(f"Status do pagamento: {type(status)}")
         
         with app.app_context():
             sse.publish({
@@ -124,13 +128,18 @@ def start_consumer():
 
     channel.basic_consume(queue='lance_validado', on_message_callback=callback_lance_validado, auto_ack=True)
     channel.basic_consume(queue='lance_invalidado', on_message_callback=callback_lance_invalidado, auto_ack=True)
-    channel.basic_consume(queue='leilao_vencedor', on_message_callback=callback_leilao_vencedor, auto_ack=True)
+    #definição da Fanout para evitar perda de mensagens
+    channel.exchange_declare(exchange='leilao_vencedor', exchange_type='fanout')
+    result = channel.queue_declare(queue='', exclusive=True)
+    queue_name = result.method.queue
+    channel.queue_bind(exchange='leilao_vencedor', queue=queue_name)
+    channel.basic_consume(queue=queue_name, on_message_callback=callback_leilao_vencedor, auto_ack=True)
     
     # TODO verificar a parte de pagamento depois
     # só descomentar quando tiver o ms_pagamento rodando de fato
-    #channel.basic_consume(queue='link_pagamento', on_message_callback=callback_link_pagamento, auto_ack=True)
-    #channel.basic_consume(queue='status_pagamento', on_message_callback=callback_status_pagamento, auto_ack=True)
-    
+    channel.basic_consume(queue='link_pagamento', on_message_callback=callback_link_pagamento, auto_ack=True)
+    channel.basic_consume(queue='status_pagamento', on_message_callback=callback_status_pagamento, auto_ack=True)
+
     print(' [*] Consumer started. Waiting messages.')
     channel.start_consuming()
 
@@ -145,13 +154,7 @@ def pagamento_page():
 @app.get("/leiloes")
 def get_leiloes():
     leiloes = requests.get(url_msleilao + "/leiloes")
-    print(f"leiloes: {leiloes.json()}")
     return jsonify(leiloes.json())
-
-@app.get("/leiloes/<int:leilao_id>")
-def get_leiloes1(leilao_id: int):
-    # TODO acho que se pá é BO do ms_leilao e nao do app.py
-    return
 
 @app.get("/cadastra_leilao")
 def cadastra_leilao_page():
@@ -192,15 +195,10 @@ def lance():
         return jsonify({"error": "Dados incompletos"}), 400
 
     resp = requests.post(url_mslance + "/lance", json=data)
-    if resp.status_code != 200:
+    if resp.status_code not in range(200, 300):
         return jsonify({"error": "Erro ao enviar lance"}), 500
-
     return jsonify({"message": "Lance enviado com sucesso"})
 
-@app.post("/pagamento")
-def pagamento():
-    # TODO ver isso depois
-    return pagamento
 
 @app.post("/registrar_interesse")
 def registrar_interesse():
@@ -234,7 +232,9 @@ def cancelar_interesse():
     return jsonify({'message': 'Interesse cancelado com sucesso'})
 
 if __name__ == "__main__":
+    import time
     t = threading.Thread(target=start_consumer, daemon=True)
     t.start()
+    time.sleep(1)  # Give RabbitMQ time to connect
     
-    app.run(host="127.0.0.1", port=4444, debug=True)
+    app.run(host="127.0.0.1", port=4444, debug=False, use_reloader=False)

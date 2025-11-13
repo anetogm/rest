@@ -28,13 +28,17 @@ leiloes = [
 	}
 ]
 
-channel = None
+# Conexão separada para publisher (threads de gerenciamento)
+publisher_connection = None
+publisher_channel = None
+publisher_lock = threading.Lock()
+
 lock = threading.Lock()
 
 app = Flask(__name__)
 
 def start_consume():
-	global channel, lock
+	"""Inicializa conexão RabbitMQ apenas para declarar filas (não consome)"""
 	try:
 		connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
 		channel = connection.channel()
@@ -42,9 +46,9 @@ def start_consume():
 		channel.queue_declare(queue='leilao_iniciado')
 		channel.queue_declare(queue='leilao_finalizado')
 		
-		lock = threading.Lock()
+		connection.close()
+		print("[ms_leilao] RabbitMQ queues declared")
 
-		threading.Thread(target=channel.start_consuming, daemon=True).start()
 	except Exception as e:
 		print(f"[ms_leilao] RabbitMQ: {e}")
 
@@ -94,13 +98,27 @@ def cria_leilao():
 		return jsonify({"error": str(e)}), 500
 
 def publicar_evento(fila, mensagem):
-    # TODO essa parada é o SSE enviando as notificações
-	try:
-		with lock:
-			channel.basic_publish(exchange='', routing_key=fila, body=mensagem)
+	"""Publica evento usando conexão dedicada para publisher"""
+	global publisher_connection, publisher_channel
+	
+	with publisher_lock:
+		try:
+			# Criar/recriar conexão se necessário
+			if publisher_connection is None or publisher_connection.is_closed:
+				publisher_connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+				publisher_channel = publisher_connection.channel()
+				publisher_channel.queue_declare(queue='leilao_iniciado')
+				publisher_channel.queue_declare(queue='leilao_finalizado')
+			
+			publisher_channel.basic_publish(exchange='', routing_key=fila, body=mensagem)
 			print(f"[x] Evento publicado em {fila}: {mensagem}")
-	except Exception as e:
-		print(f"[ms_leilao] Error publishing event: {e}")
+			return True
+		except Exception as e:
+			print(f"[ms_leilao] Error publishing event: {e}")
+			# Resetar conexão em caso de erro
+			publisher_connection = None
+			publisher_channel = None
+			return False
 
 def converte_datetime(ativos):
 	res = []
@@ -178,7 +196,20 @@ def esta_ativo(leiloes):
 
 if __name__ == "__main__":
 	print("[MS Leilao] Gerenciando leilões...")
-	threading.Thread(target=start_consume, daemon=True).start()
+	
+	# Declarar filas
+	start_consume()
+	time.sleep(0.5)
+	
+	# Inicializar conexão publisher
+	try:
+		publisher_connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+		publisher_channel = publisher_connection.channel()
+		publisher_channel.queue_declare(queue='leilao_iniciado')
+		publisher_channel.queue_declare(queue='leilao_finalizado')
+		print("[ms_leilao] Publisher connection initialized")
+	except Exception as e:
+		print(f"[ms_leilao] Failed to initialize publisher: {e}")
 
 	with lock:
 		for i, l in enumerate(leiloes):

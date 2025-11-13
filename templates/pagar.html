@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Pagar</title>
+    <style>
+        body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; padding: 2rem; color:#222 }
+        .card { max-width:520px; margin:0 auto; padding:1.5rem; border:1px solid #eee; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,0.03) }
+        button { background:#0078d4; color:#fff; border:0; padding:.6rem 1rem; border-radius:6px; font-size:1rem; cursor:pointer }
+        button[disabled] { opacity:.6; cursor:wait }
+        .status { margin-top:1rem; min-height:1.5rem }
+        .spinner { width:16px; height:16px; border:2px solid rgba(255,255,255,.3); border-top-color:#fff; border-radius:50%; display:inline-block; vertical-align:middle; margin-right:.5rem; animation:spin .9s linear infinite }
+        @keyframes spin { to { transform:rotate(360deg) } }
+        .success { color: #0b6623 }
+        .error { color: #a00 }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Pagar</h1>
+        <p>Clique no botão para iniciar o processamento do pagamento.</p>
+
+        <button id="payBtn" type="button">Iniciar pagamento</button>
+
+        <div id="status" class="status" aria-live="polite"></div>
+    </div>
+
+    <script>
+        // Extrair id_transacao da URL (ex: /pagar/tx-1-123456789)
+        const pathParts = window.location.pathname.split('/');
+        const idTransacao = pathParts[pathParts.length - 1];
+        
+        const btn = document.getElementById('payBtn');
+        const status = document.getElementById('status');
+
+        async function processaPagamento() {
+            if (!idTransacao) {
+                status.innerHTML = '<span class="error">ID de transação não encontrado na URL.</span>';
+                return;
+            }
+
+            btn.disabled = true;
+            status.innerHTML = '<span class="spinner"></span>Processando pagamento...';
+
+            try {
+                // Iniciar processamento assíncrono
+                const resp = await fetch(`http://127.0.0.1:5001/async?id_transacao=${idTransacao}`, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!resp.ok) {
+                    const text = await resp.text();
+                    throw new Error(text || `Erro HTTP ${resp.status}`);
+                }
+
+                // Iniciar pooling para verificar status
+                await verificarStatus();
+            } catch (err) {
+                console.error(err);
+                status.innerHTML = '<span class="error">Erro ao processar pagamento: ' + (err.message || err) + '</span>';
+                btn.disabled = false;
+            }
+        }
+
+        async function verificarStatus() {
+            const maxTentativas = 20; // 20 tentativas = ~10 segundos
+            let tentativa = 0;
+
+            while (tentativa < maxTentativas) {
+                await new Promise(resolve => setTimeout(resolve, 500)); // Espera 500ms
+                tentativa++;
+
+                try {
+                    const resp = await fetch(`http://127.0.0.1:5001/api/transacoes/${idTransacao}`);
+                    if (!resp.ok) continue;
+
+                    const data = await resp.json();
+                    
+                    if (data.status === 'aprovada') {
+                        status.innerHTML = '<span class="success">✓ Pagamento aprovado com sucesso!</span>';
+                        btn.disabled = false;
+                        return;
+                    } else if (data.status === 'recusada') {
+                        status.innerHTML = '<span class="error">✗ Pagamento recusado. Tente novamente.</span>';
+                        btn.disabled = false;
+                        return;
+                    }
+                    // Se ainda está 'processando', continua o loop
+                } catch (err) {
+                    console.error('Erro ao verificar status:', err);
+                }
+            }
+
+            // Timeout
+            status.innerHTML = '<span class="error">Tempo esgotado. Verifique o status manualmente.</span>';
+            btn.disabled = false;
+        }
+
+        btn.addEventListener('click', processaPagamento);
+    </script>
+</body>
+</html>

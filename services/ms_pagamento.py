@@ -5,11 +5,37 @@ import pika
 import requests
 from flask import Flask, request, jsonify
 
-connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
-channel = connection.channel()
+# Conexão separada para consumer (thread dedicada)
+consumer_connection = None
+consumer_channel = None
 
-channel.queue_declare(queue='link_pagamento')
-channel.queue_declare(queue='status_pagamento')
+# Conexão separada para publisher (Flask thread e callbacks)
+publisher_connection = None
+publisher_channel = None
+publisher_lock = threading.Lock()
+
+def publish_message(routing_key, message_dict):
+    """Função helper para publicar mensagens usando conexão dedicada"""
+    global publisher_connection, publisher_channel
+    
+    with publisher_lock:
+        try:
+            # Criar/recriar conexão se necessário
+            if publisher_connection is None or publisher_connection.is_closed:
+                publisher_connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+                publisher_channel = publisher_connection.channel()
+                publisher_channel.queue_declare(queue='link_pagamento')
+                publisher_channel.queue_declare(queue='status_pagamento')
+            
+            body = json.dumps(message_dict).encode()
+            publisher_channel.basic_publish(exchange='', routing_key=routing_key, body=body)
+            return True
+        except Exception as e:
+            print(f"[ms_pagamento] Error publishing: {e}")
+            # Resetar conexão em caso de erro
+            publisher_connection = None
+            publisher_channel = None
+            return False
 
 def callback_leilao_vencedor(ch, method, properties, body):
     print('[Pagamento] Recebido em leilao_vencedor:', body)
@@ -54,23 +80,31 @@ def callback_leilao_vencedor(ch, method, properties, body):
             'id_transacao': id_transacao,
             'link_pagamento': link_pagamento
         }
-        channel.basic_publish(exchange='', routing_key='link_pagamento', body=json.dumps(msg_link).encode())
+        publish_message('link_pagamento', msg_link)
 
         msg_status = {
             'leilao_id': leilao_id,
             'id_transacao': id_transacao,
             'status': 'pendente'
         }
-        channel.basic_publish(exchange='', routing_key='status_pagamento', body=json.dumps(msg_status).encode())
+        publish_message('status_pagamento', msg_status)
 
         print(f"[Pagamento] Publicado link_pagamento e status_pagamento inicial para leilão {leilao_id}.")
     except Exception as e:
         print(f"[Pagamento] Erro ao processar mensagem: {e}")
 
 def iniciar_consumidor():
-    channel.basic_consume(queue='leilao_vencedor', on_message_callback=callback_leilao_vencedor, auto_ack=True)
+    global consumer_connection, consumer_channel
+    consumer_connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    consumer_channel = consumer_connection.channel()
+    
+    consumer_channel.exchange_declare(exchange='leilao_vencedor', exchange_type='fanout')
+    result = consumer_channel.queue_declare(queue='', exclusive=True)
+    queue_name = result.method.queue
+    consumer_channel.queue_bind(exchange='leilao_vencedor', queue=queue_name)
+    consumer_channel.basic_consume(queue=queue_name, on_message_callback=callback_leilao_vencedor, auto_ack=True)
     print("[Pagamento] Consumindo leilao_vencedor.")
-    channel.start_consuming()
+    consumer_channel.start_consuming()
 
 app = Flask(__name__)
 
@@ -95,7 +129,7 @@ def webhook_pagamento():
             'id_transacao': id_transacao,
             'status': status
         }
-        channel.basic_publish(exchange='', routing_key='status_pagamento', body=json.dumps(msg_status).encode())
+        publish_message('status_pagamento', msg_status)
         print(f"[Pagamento] Webhook publicou status_pagamento: {msg_status}")
         return jsonify({'ok': True}), 200
     except Exception as e:
@@ -106,7 +140,20 @@ def healthz():
     return jsonify({'status': 'ok'})
 
 if __name__ == '__main__':
+    # Iniciar consumer em thread separada
     t = threading.Thread(target=iniciar_consumidor, daemon=True)
     t.start()
+    time.sleep(1)  # Give RabbitMQ time to connect
+    
+    # Inicializar conexão publisher
+    try:
+        publisher_connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+        publisher_channel = publisher_connection.channel()
+        publisher_channel.queue_declare(queue='link_pagamento')
+        publisher_channel.queue_declare(queue='status_pagamento')
+        print("[ms_pagamento] Publisher connection initialized")
+    except Exception as e:
+        print(f"[ms_pagamento] Failed to initialize publisher: {e}")
+    
     print('[Pagamento] Servindo webhook em http://127.0.0.1:4446')
-    app.run(host='127.0.0.1', port=4446, debug=True)
+    app.run(host='127.0.0.1', port=4446, debug=False, use_reloader=False)

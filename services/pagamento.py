@@ -2,9 +2,14 @@ import time
 import random
 import threading
 import requests
-from flask import Flask, request, jsonify
+import os
+from flask import Flask, request, jsonify, render_template
+from flask_cors import CORS
 
-app = Flask(__name__)
+# Configurar Flask para encontrar templates no diretório pai
+template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'templates'))
+app = Flask(__name__, template_folder=template_dir)
+CORS(app)  # Habilitar CORS para todas as rotas
 
 transacoes = {}
 
@@ -50,10 +55,28 @@ def iniciar_transacao():
 		'status': 'processando'
 	}
 
-	t = threading.Thread(target=processar_pagamento_async, args=(id_transacao, leilao_id, valor, cliente_id), daemon=True)
-	t.start()
-
 	return jsonify({'id_transacao': id_transacao, 'link_pagamento': link_pagamento})
+
+@app.get('/pagar/<id_transacao>')
+def pagar(id_transacao):
+	return render_template("pagar.html")
+
+@app.post('/async')
+def processar_async():
+	id_transacao = request.args.get('id_transacao')
+	
+	if not id_transacao:
+		return jsonify({'error': 'id_transacao é obrigatório'}), 400
+	
+	tx = transacoes.get(id_transacao)
+	if not tx:
+		return jsonify({'error': 'Transação não encontrada'}), 404
+	
+	# Iniciar processamento assíncrono
+	t = threading.Thread(target=processar_pagamento_async, args=(
+		id_transacao, tx['leilao_id'], tx['valor'], tx['cliente_id']), daemon=True)
+	t.start()
+	return jsonify({'message': 'Processamento iniciado', 'id_transacao': id_transacao}), 202
 
 @app.get('/api/transacoes/<id_transacao>')
 def get_transacao(id_transacao):
@@ -68,4 +91,4 @@ def healthz():
 
 if __name__ == '__main__':
 	print('[SistemaPagamento] Servindo em http://127.0.0.1:5001')
-	app.run(host='127.0.0.1', port=5001, debug=True)
+	app.run(host='127.0.0.1', port=5001, debug=False, use_reloader=False)
