@@ -5,7 +5,7 @@ import threading
 from flask import Flask, jsonify, request
 
 inicio = datetime.now() + timedelta(seconds=2)
-fim = inicio + timedelta(minutes=50)
+fim = inicio + timedelta(minutes=5)
 
 leiloes = [
 	{

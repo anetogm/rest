@@ -9,8 +9,6 @@ import pika
 import json
 import redis
 
-# TODO ver com o augusto se ele quer uma pagina so pro lance ou se ele acha mais interessante deixar no index.html tambem
-
 lock = threading.Lock()
 rabbitmq_lock = threading.Lock()
 channel = None
@@ -89,18 +87,17 @@ def callback_leilao_vencedor(ch, method, properties, body):
     except Exception as e:
         print(f'Erro ao processar leilao_vencedor: {e}')
 
-# TODO olhar tudo que envolve pagamento
 def callback_link_pagamento(ch, method, properties, body):
     print('[App] Recebido em link_pagamento:', body)
     try:
         data = json.loads(body.decode())
         cliente_id = data.get('cliente_id')  
-        link = data.get('link')
+        link_pagamento = data.get('link_pagamento')
         
         with app.app_context():
             sse.publish({
                 'tipo': 'link_pagamento',
-                'link': link
+                'link_pagamento': link_pagamento
             }, channel=cliente_id)
     except Exception as e:
         print(f'Erro ao processar link_pagamento: {e}')
@@ -128,15 +125,13 @@ def start_consumer():
 
     channel.basic_consume(queue='lance_validado', on_message_callback=callback_lance_validado, auto_ack=True)
     channel.basic_consume(queue='lance_invalidado', on_message_callback=callback_lance_invalidado, auto_ack=True)
-    #definição da Fanout para evitar perda de mensagens
+
     channel.exchange_declare(exchange='leilao_vencedor', exchange_type='fanout')
     result = channel.queue_declare(queue='', exclusive=True)
     queue_name = result.method.queue
     channel.queue_bind(exchange='leilao_vencedor', queue=queue_name)
     channel.basic_consume(queue=queue_name, on_message_callback=callback_leilao_vencedor, auto_ack=True)
     
-    # TODO verificar a parte de pagamento depois
-    # só descomentar quando tiver o ms_pagamento rodando de fato
     channel.basic_consume(queue='link_pagamento', on_message_callback=callback_link_pagamento, auto_ack=True)
     channel.basic_consume(queue='status_pagamento', on_message_callback=callback_status_pagamento, auto_ack=True)
 

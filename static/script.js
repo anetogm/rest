@@ -102,7 +102,7 @@ function conectarSSE() {
           `Leilão ${data.leilao_id} encerrado. Vencedor: ${data.id_vencedor}`
         );
       } else if (data.tipo === "link_pagamento") {
-        alert(`Link de pagamento: ${data.link}`);
+        exibirLinkPagamento(data.link_pagamento);
       } else if (data.tipo === "status_pagamento") {
         alert(`Status do pagamento: ${data.status}`);
       }
@@ -131,6 +131,17 @@ function getUserIdFromSessionStorage() {
     sessionStorage.setItem("userId", userId);
   }
   return userId;
+}
+
+function exibirLinkPagamento(link) {
+  const demoEl = document.getElementById("demo");
+  const linkDiv = document.createElement("div");
+  linkDiv.style.marginTop = "20px";
+  linkDiv.style.padding = "10px";
+  linkDiv.style.border = "1px solid #ccc";
+  linkDiv.style.backgroundColor = "#f9f9f9";
+  linkDiv.innerHTML = `<strong>Link de Pagamento:</strong> <a href="${link}" target="_blank">${link}</a>`;
+  demoEl.appendChild(linkDiv);
 }
 
 window.onload = function () {
