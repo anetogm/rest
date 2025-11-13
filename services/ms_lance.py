@@ -11,9 +11,7 @@ app = Flask(__name__)
 leiloes_ativos = {}
 lances_atuais = {}
 
-# Conexão separada para consumer (thread dedicada)
 consumer_channel = None
-# Conexão separada para publisher (Flask thread)
 publisher_connection = None
 publisher_channel = None
 publisher_lock = threading.Lock()
@@ -54,7 +52,6 @@ def callback_leilao_finalizado(ch, method, properties, body):
 
     if vencedor:
         msg_vencedor = json.dumps({'leilao_id': leilao_id, 'id_vencedor': vencedor['id_cliente'], 'valor': vencedor['valor']})
-        # Usar o próprio canal do consumer para publicar (mesma thread)
         publicar_fanout('leilao_vencedor', msg_vencedor)
         print(f"Vencedor publicado: {msg_vencedor}")
 
@@ -73,12 +70,10 @@ def start_consumer():
     consumer_channel.start_consuming()
 
 def publish_message(routing_key, message):
-    """Função helper para publicar mensagens usando conexão dedicada"""
     global publisher_connection, publisher_channel
     
     with publisher_lock:
         try:
-            # Criar/recriar conexão se necessário
             if publisher_connection is None or publisher_connection.is_closed:
                 publisher_connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
                 publisher_channel = publisher_connection.channel()
@@ -89,18 +84,15 @@ def publish_message(routing_key, message):
             return True
         except Exception as e:
             print(f"[ms_lance] Error publishing: {e}")
-            # Resetar conexão em caso de erro
             publisher_connection = None
             publisher_channel = None
             return False
 
 def publicar_fanout(exchange, message):
-    """Publica mensagem em exchange fanout"""
     global publisher_connection, publisher_channel
     
     with publisher_lock:
         try:
-            # Criar/recriar conexão se necessário
             if publisher_connection is None or publisher_connection.is_closed:
                 publisher_connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
                 publisher_channel = publisher_connection.channel()
@@ -113,7 +105,6 @@ def publicar_fanout(exchange, message):
             return True
         except Exception as e:
             print(f"[ms_lance] Error publishing to fanout: {e}")
-            # Resetar conexão em caso de erro
             publisher_connection = None
             publisher_channel = None
             return False                            
@@ -148,9 +139,8 @@ def receber_lance():
 if __name__ == "__main__":
     import time
     
-    # Iniciar consumer em thread separada
     t = threading.Thread(target=start_consumer, daemon=True)
     t.start()
-    time.sleep(1)  # Give RabbitMQ time to connect
+    time.sleep(1)
 
     app.run(host="127.0.0.1", port=4445, debug=False, use_reloader=False)

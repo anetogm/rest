@@ -6,10 +6,9 @@ import os
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 
-# Configurar Flask para encontrar templates no diretório pai
 template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'templates'))
 app = Flask(__name__, template_folder=template_dir)
-CORS(app)  # Habilitar CORS para todas as rotas
+CORS(app)
 
 transacoes = {}
 
@@ -72,7 +71,6 @@ def processar_async():
 	if not tx:
 		return jsonify({'error': 'Transação não encontrada'}), 404
 	
-	# Iniciar processamento assíncrono
 	t = threading.Thread(target=processar_pagamento_async, args=(
 		id_transacao, tx['leilao_id'], tx['valor'], tx['cliente_id']), daemon=True)
 	t.start()

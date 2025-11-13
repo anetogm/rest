@@ -6,6 +6,7 @@ import secrets
 import threading
 import pika
 import json
+import time
 import redis
 
 lock = threading.Lock()
@@ -226,9 +227,8 @@ def cancelar_interesse():
     return jsonify({'message': 'Interesse cancelado com sucesso'})
 
 if __name__ == "__main__":
-    import time
     t = threading.Thread(target=start_consumer, daemon=True)
     t.start()
-    time.sleep(1)  # Give RabbitMQ time to connect
+    time.sleep(1)
     
     app.run(host="127.0.0.1", port=4444, debug=False, use_reloader=False)

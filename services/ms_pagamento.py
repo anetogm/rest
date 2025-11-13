@@ -5,22 +5,18 @@ import pika
 import requests
 from flask import Flask, request, jsonify
 
-# Conexão separada para consumer (thread dedicada)
 consumer_connection = None
 consumer_channel = None
 
-# Conexão separada para publisher (Flask thread e callbacks)
 publisher_connection = None
 publisher_channel = None
 publisher_lock = threading.Lock()
 
 def publish_message(routing_key, message_dict):
-    """Função helper para publicar mensagens usando conexão dedicada"""
     global publisher_connection, publisher_channel
     
     with publisher_lock:
         try:
-            # Criar/recriar conexão se necessário
             if publisher_connection is None or publisher_connection.is_closed:
                 publisher_connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
                 publisher_channel = publisher_connection.channel()
@@ -32,7 +28,6 @@ def publish_message(routing_key, message_dict):
             return True
         except Exception as e:
             print(f"[ms_pagamento] Error publishing: {e}")
-            # Resetar conexão em caso de erro
             publisher_connection = None
             publisher_channel = None
             return False
@@ -140,12 +135,10 @@ def healthz():
     return jsonify({'status': 'ok'})
 
 if __name__ == '__main__':
-    # Iniciar consumer em thread separada
     t = threading.Thread(target=iniciar_consumidor, daemon=True)
     t.start()
-    time.sleep(1)  # Give RabbitMQ time to connect
+    time.sleep(1)
     
-    # Inicializar conexão publisher
     try:
         publisher_connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
         publisher_channel = publisher_connection.channel()
