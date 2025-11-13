@@ -1,7 +1,6 @@
 from flask import Flask, jsonify, render_template, request, redirect
 from flask_cors import CORS
 from flask_sse import sse
-from apscheduler.schedulers.background import BackgroundScheduler
 import requests
 import secrets
 import threading
